@@ -4,6 +4,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { GlassCard } from '../../components/GlassCard';
 import { useToast } from '../../components/Toast';
+import { LanguageSelector } from '../../components/LanguageSelector';
+import { useLanguage } from '../../context/LanguageContext';
+import { VoiceInput } from '../../components/VoiceInput';
+import { VoiceOutput } from '../../components/VoiceOutput';
 import api from '../../services/api';
 import {
   GraduationCap,
@@ -27,6 +31,7 @@ import {
 } from 'lucide-react';
 
 export const AssistantPage = () => {
+  const { currentLang, t } = useLanguage();
   const { user } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -114,7 +119,7 @@ export const AssistantPage = () => {
     setInputValue('');
     setLoading(true);
 
-    api.post('/chat', { message: textToSend })
+    api.post('/chat', { message: textToSend, language: currentLang })
       .then((res) => {
         const aiMsg = {
           sender: 'ai',
@@ -137,7 +142,7 @@ export const AssistantPage = () => {
       <div className="absolute bottom-[5%] right-[-5%] w-[500px] h-[500px] rounded-full bg-indigo-400/10 blur-[120px] pointer-events-none animate-pulse-slow"></div>
 
       {/* Navbar */}
-      <nav className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between relative z-10">
+      <nav className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between relative z-50">
         <div className="flex items-center gap-2">
           <Link to="/dashboard" className="p-2 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-lg flex items-center">
             <GraduationCap className="w-6 h-6" />
@@ -148,8 +153,9 @@ export const AssistantPage = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <LanguageSelector />
           <Link to="/dashboard" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-350 font-semibold text-sm transition-all">
-            <ArrowLeft className="w-4.5 h-4.5" /> Back
+            <ArrowLeft className="w-4.5 h-4.5" /> {t('back', 'Back')}
           </Link>
           <ThemeToggle />
         </div>
@@ -483,11 +489,18 @@ export const AssistantPage = () => {
                         <p className="whitespace-pre-wrap">{msg.text}</p>
                       </div>
                     ) : (
-                      renderMessageText(msg.text)
+                      <>
+                        {renderMessageText(msg.text)}
+                      </>
                     )}
-                    <span className={`block text-[9px] font-bold text-slate-400 mt-1 ${msg.sender === 'user' ? 'text-right' : ''}`}>
-                      {msg.time}
-                    </span>
+                    <div className={`flex items-center gap-2 mt-1 ${msg.sender === 'user' ? 'justify-end' : 'justify-between'}`}>
+                      {msg.sender !== 'user' && (
+                        <VoiceOutput text={msg.text} />
+                      )}
+                      <span className="block text-[9px] font-bold text-slate-400">
+                        {msg.time}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -514,11 +527,15 @@ export const AssistantPage = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Form Input Bar with Cyan Glow border */}
-          <div className="p-4 border-t border-slate-300/30 dark:border-slate-850/30 bg-white/30 dark:bg-slate-950/20 backdrop-blur flex gap-2">
+          {/* Form Input Bar with Voice Microphone and Cyan Glow border */}
+          <div className="p-4 border-t border-slate-300/30 dark:border-slate-850/30 bg-white/30 dark:bg-slate-950/20 backdrop-blur flex items-center gap-2">
+            <VoiceInput
+              onTranscript={(transcript) => setInputValue(transcript)}
+              disabled={loading}
+            />
             <input
               type="text"
-              placeholder="Ask ScholarAI anything..."
+              placeholder={t('askAssistantPlaceholder', 'Ask ScholarAI anything...')}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend(inputValue)}
@@ -526,9 +543,10 @@ export const AssistantPage = () => {
             />
             <button
               onClick={() => handleSend(inputValue)}
-              className="px-5 py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-bold text-xs shadow-md hover:opacity-95 transition-all focus:outline-none"
+              disabled={loading}
+              className="px-5 py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-bold text-xs shadow-md hover:opacity-95 transition-all focus:outline-none cursor-pointer disabled:opacity-50"
             >
-              Send
+              {t('send', 'Send')}
             </button>
           </div>
         </GlassCard>

@@ -20,13 +20,15 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminRoute } from './components/AdminRoute';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './components/Toast';
+import { LanguageProvider } from './context/LanguageContext';
 
 function App() {
   return (
     <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <Routes>
+      <LanguageProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -68,7 +70,8 @@ function App() {
           </Routes>
         </AuthProvider>
       </ToastProvider>
-    </BrowserRouter>
+    </LanguageProvider>
+  </BrowserRouter>
   );
 }
 

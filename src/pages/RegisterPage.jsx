@@ -14,8 +14,11 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { authService } from '../services/authService';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../context/LanguageContext';
 
 export const RegisterPage = () => {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -174,22 +177,23 @@ export const RegisterPage = () => {
       <div className="absolute top-[5%] left-[5%] w-[400px] h-[400px] rounded-full bg-sky-400/15 blur-[120px] pointer-events-none animate-pulse-slow"></div>
       <div className="absolute bottom-[5%] right-[5%] w-[400px] h-[400px] rounded-full bg-indigo-400/15 blur-[120px] pointer-events-none animate-pulse-slow"></div>
 
-      <div className="absolute top-5 right-5 z-10 flex items-center gap-3">
+      <div className="absolute top-5 right-5 z-50 flex items-center gap-3">
+        <LanguageSelector />
         <Link
           to="/"
           className="flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-2.5 rounded-xl glass-panel"
         >
-          <ArrowLeft className="w-4 h-4" /> Home
+          <ArrowLeft className="w-4 h-4" /> {t('home', 'Home')}
         </Link>
         <ThemeToggle />
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-2xl relative z-10">
         <h2 className="text-center text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-600 to-indigo-600 dark:from-sky-400 dark:to-indigo-400 mb-2">
-          Create Account
+          {t('createAccount', 'Create Account')}
         </h2>
         <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-8">
-          Join AI Scholarship Assistant today and discover matching funding opportunities
+          {t('registerSubtitle', 'Join AI Scholarship Assistant today and discover matching funding opportunities')}
         </p>
 
         <GlassCard className="border border-white/20 shadow-2xl">
@@ -202,7 +206,7 @@ export const RegisterPage = () => {
               </h3>
 
               <InputField
-                label="Full Name"
+                label={t('fullName', 'Full Name')}
                 name="fullName"
                 placeholder="e.g. John Doe"
                 icon={User}
@@ -213,7 +217,7 @@ export const RegisterPage = () => {
                 required
               />
               <InputField
-                label="Email Address"
+                label={t('emailAddress', 'Email Address')}
                 name="email"
                 type="email"
                 placeholder="e.g. student@gmail.com"
@@ -234,7 +238,7 @@ export const RegisterPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <InputField
-                    label="Password"
+                    label={t('password', 'Password')}
                     name="password"
                     type="password"
                     placeholder="Min 8 characters (letters & numbers)"
@@ -262,7 +266,7 @@ export const RegisterPage = () => {
                   )}
                 </div>
                 <InputField
-                  label="Confirm Password"
+                  label={t('confirmPassword', 'Confirm Password')}
                   name="confirmPassword"
                   type="password"
                   placeholder="Re-enter password"
@@ -286,20 +290,20 @@ export const RegisterPage = () => {
               ) : (
                 <Sparkles className="w-5 h-5 mr-2" />
               )}
-              {isLoading ? 'Creating Account...' : 'Complete Registration'}
+              {isLoading ? t('creatingAccount', 'Creating Account...') : t('signUp', 'Complete Registration')}
             </button>
 
           </form>
 
           <div className="mt-6 text-center border-t border-slate-300/40 dark:border-slate-800/40 pt-5">
             <span className="text-sm text-slate-500 dark:text-slate-400">
-              Already have an account?{' '}
+              {t('alreadyHaveAccount', 'Already have an account?')}{' '}
             </span>
             <Link
               to="/login"
               className="text-sm font-semibold text-sky-600 dark:text-sky-400 hover:underline hover:text-sky-500 dark:hover:text-sky-300 transition-colors"
             >
-              Login Here
+              {t('login', 'Login Here')}
             </Link>
           </div>
         </GlassCard>

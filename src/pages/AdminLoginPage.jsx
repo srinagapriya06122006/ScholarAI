@@ -7,14 +7,19 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/Toast';
 import { authService } from '../services/authService';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { CloudflareTurnstileWidget } from '../components/CloudflareTurnstileWidget';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../context/LanguageContext';
 
 export const AdminLoginPage = () => {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isCfVerified, setIsCfVerified] = useState(false);
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -65,12 +70,13 @@ export const AdminLoginPage = () => {
       <div className="absolute top-[15%] right-[15%] w-[400px] h-[400px] rounded-full bg-indigo-500/15 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[15%] left-[15%] w-[400px] h-[400px] rounded-full bg-violet-600/15 blur-[120px] pointer-events-none"></div>
 
-      <div className="absolute top-5 right-5 z-10 flex items-center gap-3">
+      <div className="absolute top-5 right-5 z-50 flex items-center gap-3">
+        <LanguageSelector />
         <Link
           to="/"
           className="flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-2.5 rounded-xl glass-panel"
         >
-          <ArrowLeft className="w-4 h-4" /> Home
+          <ArrowLeft className="w-4 h-4" /> {t('home', 'Home')}
         </Link>
         <ThemeToggle />
       </div>
@@ -83,16 +89,16 @@ export const AdminLoginPage = () => {
         </div>
 
         <h2 className="text-center text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400 mb-2">
-          Admin Portal
+          {t('adminLoginTitle', 'Admin Portal')}
         </h2>
         <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-6">
-          Student Scholarship Verification & Management System
+          {t('adminSubtitle', 'Student Scholarship Verification & Management System')}
         </p>
 
         <GlassCard className="border border-indigo-500/20 shadow-2xl overflow-hidden p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <InputField
-              label="Admin Email"
+              label={t('adminEmail', 'Admin Email')}
               name="email"
               type="email"
               placeholder="admin@scholarship.com"
@@ -105,7 +111,7 @@ export const AdminLoginPage = () => {
 
             <div>
               <InputField
-                label="Admin Password"
+                label={t('adminPassword', 'Admin Password')}
                 name="password"
                 type="password"
                 placeholder="Enter admin password"
@@ -117,9 +123,15 @@ export const AdminLoginPage = () => {
               />
             </div>
 
+            {/* Cloudflare Verification Challenge Widget */}
+            <CloudflareTurnstileWidget 
+              title="Microsoft"
+              onVerified={(verified) => setIsCfVerified(verified)}
+            />
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !isCfVerified}
               className="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-500/20 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
@@ -127,7 +139,7 @@ export const AdminLoginPage = () => {
               ) : (
                 <ShieldCheck className="w-5 h-5 mr-2" />
               )}
-              {isLoading ? 'Verifying Admin Authority...' : 'Access Admin Dashboard'}
+              {isLoading ? t('verifyingAdminAuthority', 'Verifying Admin Authority...') : t('accessAdminDashboard', 'Access Admin Dashboard')}
             </button>
           </form>
 
@@ -136,10 +148,10 @@ export const AdminLoginPage = () => {
               to="/login"
               className="font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
             >
-              ← Student Login
+              ← {t('studentLogin', 'Student Login')}
             </Link>
             <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Secure Authentication
+              <CheckCircle2 className="w-3.5 h-3.5" /> {t('secureAuthentication', 'Secure Authentication')}
             </span>
           </div>
         </GlassCard>

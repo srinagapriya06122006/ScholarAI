@@ -427,9 +427,8 @@ def _build_sources_section(matches: list, db=None) -> str:
 
 # ─────────────────────────────────────────────
 # Main RAG Response Generator
-# ─────────────────────────────────────────────
-def generate_rag_response(user_query: str, user_profile_summary: str = "", extra_context: str = "", db: Session = None, user_id: int = None) -> Dict:
-    """Routes queries to structured intent responses or Gemini fallback."""
+def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", extra_context: str = "", db: Session = None, user_id: int = None) -> Dict:
+    """Routes queries to structured intent responses or Gemini fallback in English."""
     q_lower = user_query.lower()
     today_str = date.today().strftime("%d %b %Y")
 
@@ -868,3 +867,21 @@ Respond accurately and helpfully:"""
         "confidence": "MEDIUM"
     }
 
+def generate_rag_response(user_query: str, user_profile_summary: str = "", extra_context: str = "", db: Session = None, user_id: int = None, language: str = "en") -> Dict:
+    """Multilingual wrapper for RAG advisor using Cloudflare Workers AI translation."""
+    res = _generate_rag_response_en(
+        user_query=user_query,
+        user_profile_summary=user_profile_summary,
+        extra_context=extra_context,
+        db=db,
+        user_id=user_id
+    )
+    if language and language.lower() not in ("en", "english"):
+        from ..services.translation_service import translate_single_text
+        try:
+            translated_answer = translate_single_text(res["answer"], target_lang=language.lower())
+            if translated_answer:
+                res["answer"] = translated_answer
+        except Exception as e:
+            print(f"[RAG Translation Warning]: {e}")
+    return res

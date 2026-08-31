@@ -8,12 +8,17 @@ import { useToast } from '../components/Toast';
 import { validateEmail, validatePassword } from '../utils/validation';
 import { authService } from '../services/authService';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { CloudflareTurnstileWidget } from '../components/CloudflareTurnstileWidget';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../context/LanguageContext';
 
 export const LoginPage = () => {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [isCfVerified, setIsCfVerified] = useState(false);
 
   const { login } = useAuth();
   const { showToast } = useToast();
@@ -137,28 +142,29 @@ export const LoginPage = () => {
       <div className="absolute top-[10%] right-[10%] w-[350px] h-[350px] rounded-full bg-sky-400/20 blur-[100px] pointer-events-none animate-pulse-slow"></div>
       <div className="absolute bottom-[10%] left-[10%] w-[350px] h-[350px] rounded-full bg-indigo-400/20 blur-[100px] pointer-events-none animate-pulse-slow"></div>
 
-      <div className="absolute top-5 right-5 z-10 flex items-center gap-3">
+      <div className="absolute top-5 right-5 z-50 flex items-center gap-3">
+        <LanguageSelector />
         <Link
           to="/"
           className="flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-2.5 rounded-xl glass-panel"
         >
-          <ArrowLeft className="w-4 h-4" /> Home
+          <ArrowLeft className="w-4 h-4" /> {t('home', 'Home')}
         </Link>
         <ThemeToggle />
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <h2 className="text-center text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-600 to-indigo-600 dark:from-sky-400 dark:to-indigo-400 mb-2">
-          Welcome Back
+          {t('welcomeBack', 'Welcome Back')}
         </h2>
         <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-8">
-          Log in to continue managing your scholarships
+          {t('loginSubtitle', 'Log in to continue managing your scholarships')}
         </p>
 
         <GlassCard className="border border-white/20 shadow-2xl overflow-hidden p-6 sm:p-8">
           <form onSubmit={handleLoginSubmit} className="space-y-5">
             <InputField
-              label="Email Address"
+              label={t('emailAddress', 'Email Address')}
               name="email"
               type="email"
               placeholder="e.g. name@college.edu"
@@ -172,7 +178,7 @@ export const LoginPage = () => {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Password <span className="text-rose-500">*</span>
+                  {t('password', 'Password')} <span className="text-rose-500">*</span>
                 </label>
                 <button
                   type="button"
@@ -180,7 +186,7 @@ export const LoginPage = () => {
                   disabled={forgotLoading}
                   className="text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium transition-colors focus:outline-none cursor-pointer"
                 >
-                  {forgotLoading ? 'Sending...' : 'Forgot Password?'}
+                  {forgotLoading ? 'Sending...' : t('forgotPassword', 'Forgot Password?')}
                 </button>
               </div>
               <InputField
@@ -195,9 +201,15 @@ export const LoginPage = () => {
               />
             </div>
 
+            {/* Cloudflare Verification Challenge Widget */}
+            <CloudflareTurnstileWidget 
+              title="Microsoft"
+              onVerified={(verified) => setIsCfVerified(verified)}
+            />
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !isCfVerified}
               className="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-sky-500/10 text-sm font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
@@ -205,14 +217,14 @@ export const LoginPage = () => {
               ) : (
                 <LogIn className="w-5 h-5 mr-2" />
               )}
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? t('signingIn', 'Signing In...') : t('signIn', 'Sign In')}
             </button>
           </form>
 
           {/* ── OR Divider ── */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-slate-300/50 dark:bg-slate-700/50"></div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">or</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">{t('or', 'or')}</span>
             <div className="flex-1 h-px bg-slate-300/50 dark:bg-slate-700/50"></div>
           </div>
 
@@ -230,19 +242,19 @@ export const LoginPage = () => {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
             <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              Sign in with Google
+              {t('signInWithGoogle', 'Sign in with Google')}
             </span>
           </button>
 
           <div className="mt-6 text-center border-t border-slate-300/40 dark:border-slate-800/40 pt-5">
             <span className="text-sm text-slate-500 dark:text-slate-400">
-              Don't have an account?{' '}
+              {t('dontHaveAccount', "Don't have an account?")}{' '}
             </span>
             <Link
               to="/register"
               className="text-sm font-semibold text-sky-600 dark:text-sky-400 hover:underline hover:text-sky-500 dark:hover:text-sky-300 transition-colors"
             >
-              Register Here
+              {t('registerHere', 'Register Here')}
             </Link>
           </div>
         </GlassCard>

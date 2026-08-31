@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../../components/Toast';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import { LanguageSelector } from '../../components/LanguageSelector';
 import { GlassCard } from '../../components/GlassCard';
 import { InputField } from '../../components/InputField';
 import {
@@ -41,7 +42,7 @@ export const SettingsPage = () => {
       <div className="absolute bottom-[5%] right-[-5%] w-[500px] h-[500px] rounded-full bg-indigo-400/10 blur-[120px] pointer-events-none animate-pulse-slow"></div>
 
       {/* Navbar */}
-      <nav className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between relative z-10">
+      <nav className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between relative z-50">
         <div className="flex items-center gap-2">
           <Link to="/dashboard" className="p-2 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-lg flex items-center">
             <GraduationCap className="w-6 h-6" />
@@ -52,6 +53,7 @@ export const SettingsPage = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <LanguageSelector />
           <Link to="/dashboard" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-350 font-semibold text-sm transition-all">
             <ArrowLeft className="w-4.5 h-4.5" /> Back
           </Link>

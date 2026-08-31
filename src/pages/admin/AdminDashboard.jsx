@@ -37,11 +37,14 @@ import {
 } from 'lucide-react';
 import { GlassCard } from '../../components/GlassCard';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import { LanguageSelector } from '../../components/LanguageSelector';
+import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../components/Toast';
 import api from '../../services/api';
 
 export const AdminDashboard = () => {
+  const { t } = useLanguage();
   const { user, logout } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -380,6 +383,7 @@ export const AdminDashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <LanguageSelector />
             <ThemeToggle />
 
             <div className="h-6 w-px bg-slate-200 dark:bg-slate-800"></div>
@@ -400,7 +404,7 @@ export const AdminDashboard = () => {
                 title="Log Out"
               >
                 <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign Out</span>
+                <span className="hidden sm:inline">{t('logout', 'Sign Out')}</span>
               </button>
             </div>
           </div>

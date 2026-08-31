@@ -5,16 +5,20 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5.0+-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Playwright](https://img.shields.io/badge/Playwright-Automated_RPA-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev/)
+[![Cloudflare Workers AI](https://img.shields.io/badge/Cloudflare-Workers_AI-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/workers-ai/)
+[![Web Speech API](https://img.shields.io/badge/Web_Speech_API-STT_&_TTS-9C27B0?style=for-the-badge&logo=googlechrome&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API)
 [![Google Gemini](https://img.shields.io/badge/Google_Gemini-3.5/3.6_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Brevo](https://img.shields.io/badge/Email-Brevo_Transactional-0B996F?style=for-the-badge&logo=sendinblue&logoColor=white)](https://www.brevo.com/)
 [![MySQL](https://img.shields.io/badge/Database-MySQL_/_SQLite-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 
-**ScholarAI** is an autonomous multi-agent AI scholarship advisory, automated certificate verification, and real-time educational assistant platform. It pairs rule-based engines, computer vision OCR, stateful supervisor orchestrators, live visible Playwright browser automation for web verification, transactional notifications via Brevo, and Retrieval-Augmented Generation (RAG) powered by Google Gemini to help students discover verified funding, evaluate eligibility across 16 strict criteria, audit document authenticity, and manage applications seamlessly.
+**ScholarAI** is an autonomous multi-agent AI scholarship advisory, automated certificate verification, and real-time educational assistant platform. It pairs rule-based engines, computer vision OCR, stateful supervisor orchestrators, live visible Playwright browser automation for web verification, transactional notifications via Brevo, Retrieval-Augmented Generation (RAG) powered by Google Gemini, **dynamic multi-language translation via Cloudflare Workers AI**, and **voice chat interaction with Speech-to-Text and Text-to-Speech** to help students discover verified funding, evaluate eligibility across 16 strict criteria, audit document authenticity, and manage applications seamlessly in 10 languages.
 
 ---
 
 ## 📑 Table of Contents
 - [✨ Key Accomplishments & Features](#-key-accomplishments--features)
+- [🌐 Dynamic Multilingual Translation Engine (Cloudflare Workers AI)](#-dynamic-multilingual-translation-engine-cloudflare-workers-ai)
+- [🎙️ Voice Chat Subsystem (STT & TTS)](#️-voice-chat-subsystem-stt--tts)
 - [🏛️ System Architecture Diagram](#️-system-architecture-diagram)
 - [📂 Detailed Folder & File Architecture](#-detailed-folder--file-architecture)
 - [🤖 Multi-Agent Ecosystem & Lifecycle](#-multi-agent-ecosystem--lifecycle)
@@ -52,6 +56,72 @@
    - Asynchronous background email delivery for instant application receipts, status updates, and committee decisions bound securely to verified user emails.
 9. **Admin Review & Monitoring Console**:
    - Role-based admin access (`admin@scholarship.com` / `Admin@123`) providing platform analytics, real-time student registry management, application reviews, document audits, and instant status approvals/rejections.
+10. **Cloudflare Workers AI Dynamic Translation Engine**:
+    - Complete on-the-fly dynamic translation for both static UI and dynamic database scholarship content across 10 languages (English, Tamil, Hindi, Telugu, Malayalam, Kannada, Bengali, Marathi, Gujarati, Punjabi).
+    - Powered by `@cf/meta/llama-3.1-8b-instruct` with strict educational UI terminology grounding (e.g. *"Document Verification"* -> *"ஆவண சரிபார்ப்பு"*, *"Student Profile"* -> *"மாணவர் சுயவிவரம்"*).
+    - Dual-layer caching: In-memory backend LRU cache + persistent frontend `localStorage` cache for sub-millisecond lookups on repeated visits.
+    - Intelligent 60ms batch request queuing preventing duplicate calls and render loops.
+    - Original MySQL database records remain untouched in English.
+11. **Voice Chat Interaction (Speech-to-Text & Text-to-Speech)**:
+    - Integrated directly into the ScholarAI Chatbot (`AssistantPage.jsx`).
+    - **Voice Input (STT)**: Browser-native `SpeechRecognition` capturing spoken queries in the student's selected language (`ta-IN`, `hi-IN`, `te-IN`, etc.) and placing text into the input field for student review before sending.
+    - **Voice Output (TTS)**: Browser-native `SpeechSynthesis` reading AI responses aloud with natural speech markdown/URL cleaning, automatic regional voice matching, and live playback controls (Listen / Stop).
+
+---
+
+## 🌐 Dynamic Multilingual Translation Engine (Cloudflare Workers AI)
+
+ScholarAI features a **pure dynamic translation architecture** powered by Cloudflare Workers AI that eliminates the need to manually maintain bloated static translation files:
+
+```text
+Student Selects Language (e.g. தமிழ்)
+              ↓
+LanguageContext (stores active language code)
+              ↓
+TranslationManager (checks memory + localStorage cache)
+              ↓
+[ Cache Miss? ] ──> 60ms Batch Request Queue
+              ↓
+POST /api/v1/translate
+              ↓
+Cloudflare Workers AI (@cf/meta/llama-3.1-8b-instruct)
+              ↓
+Clean, accurate, domain-grounded translation
+              ↓
+Cached in memory & localStorage -> Reactive UI Update
+```
+
+### Supported Languages (10):
+| Code | Language | Native Name | TTS / STT Regional Code |
+| :---: | :--- | :--- | :---: |
+| `en` | English | English | `en-IN` |
+| `ta` | Tamil | தமிழ் | `ta-IN` |
+| `hi` | Hindi | हिन्दी | `hi-IN` |
+| `te` | Telugu | తెలుగు | `te-IN` |
+| `ml` | Malayalam | മലയാളம் | `ml-IN` |
+| `kn` | Kannada | ಕನ್ನಡ | `kn-IN` |
+| `bn` | Bengali | বাংলা | `bn-IN` |
+| `mr` | Marathi | मराठी | `mr-IN` |
+| `gu` | Gujarati | ગુજરાતી | `gu-IN` |
+| `pa` | Punjabi | ਪੰਜਾਬੀ | `pa-IN` |
+
+---
+
+## 🎙️ Voice Chat Subsystem (STT & TTS)
+
+Integrated seamlessly into `src/pages/dashboard/AssistantPage.jsx`:
+
+1. **Microphone (Voice Input - STT)**:
+   - Component: [`src/components/VoiceInput.jsx`](file:///c:/Users/srina/OneDrive/Desktop/sriramajayam/newbeg/src/components/VoiceInput.jsx)
+   - Uses Web Speech API `SpeechRecognition` configured with the active language tag (`ta-IN`, `hi-IN`, etc.).
+   - Displays real-time pulsing listening orb and badge (`Listening in தமிழ்...`).
+   - Populates the existing input field without auto-submitting, giving students full control to review or edit before sending.
+
+2. **Speaker (Voice Output - TTS)**:
+   - Component: [`src/components/VoiceOutput.jsx`](file:///c:/Users/srina/OneDrive/Desktop/sriramajayam/newbeg/src/components/VoiceOutput.jsx)
+   - Uses `window.speechSynthesis` with runtime voice detection (`getBestVoiceForLanguage`).
+   - Cleans markdown formatting, table borders, URLs, and emojis before synthesis.
+   - Includes real-time **Listen (🔊)** and **Stop (⏹)** controls.
 
 ---
 
@@ -111,7 +181,8 @@ newbeg/
 │   │   │   └── verification_agent.py             # Cross-auditing logic with compact/fuzzy name matching
 │   │   │
 │   │   ├── services/
-│   │   │   └── email_service.py                  # Brevo transactional email delivery service
+│   │   │   ├── email_service.py                  # Brevo transactional email delivery service
+│   │   │   └── translation_service.py            # Cloudflare Workers AI (Llama 3.1 8B) translation service
 │   │   │
 │   │   ├── auth.py                               # JWT token creation, OAuth handling & bcrypt hashing
 │   │   ├── crud.py                               # Database CRUD operations for profiles, docs, and apps
@@ -120,7 +191,7 @@ newbeg/
 │   │   ├── models.py                             # Database models (User, Profile, Document, Application, etc.)
 │   │   └── schemas.py                            # Pydantic validation schemas
 │   │
-│   ├── .env                                      # Backend secrets (API keys, Database URLs)
+│   ├── .env                                      # Backend secrets (API keys, Cloudflare creds, DB URLs)
 │   ├── requirements.txt                          # Python package dependencies
 │   └── Scholarship_Verification.xlsx             # Live Excel audit log generated by Google RPA Agent
 │
@@ -130,33 +201,49 @@ newbeg/
 │   │   ├── AdaptiveRpaVerificationModal.jsx      # Modal showing live Google RPA steps & comparison matrix
 │   │   ├── AutopilotGuide.jsx                    # Dynamic 12-stage workflow guide banner
 │   │   ├── GlassCard.jsx                         # Glassmorphic card container with gradient borders
+│   │   ├── LanguageSelector.jsx                  # Multilingual selector with high z-index & active flags
 │   │   ├── Navbar.jsx                            # Navigation bar with notification center & user pill
 │   │   ├── Sidebar.jsx                           # Dashboard navigation sidebar
-│   │   └── Toast.jsx                             # Notification toast provider
+│   │   ├── Toast.jsx                             # Notification toast provider
+│   │   ├── VoiceInput.jsx                        # Speech-to-Text mic button with live audio pulse
+│   │   └── VoiceOutput.jsx                       # Text-to-Speech audio reader with start/stop controls
+│   │
+│   ├── config/
+│   │   └── languages.js                          # 10-language metadata definitions & BCP-47 voice tags
 │   │
 │   ├── context/
-│   │   └── AuthContext.jsx                       # Authentication state & JWT session management
+│   │   ├── AuthContext.jsx                       # Authentication state & JWT session management
+│   │   └── LanguageContext.jsx                   # Dynamic Cloudflare translation context & t() provider
 │   │
-│   ├── pages/                                    # Application Views & Pages
+│   ├── pages/                                    # Application Views & Pages (All with LanguageSelector & z-50 Navbar)
 │   │   ├── admin/                                # Admin Console
-│   │   │   └── AdminDashboardPage.jsx            # Admin monitoring, analytics, and application approval console
+│   │   │   └── AdminDashboard.jsx                # Admin monitoring, analytics, and application approval console
 │   │   │
 │   │   ├── auth/                                 # Authentication Pages
 │   │   │   ├── LoginPage.jsx                     # Traditional & Google OAuth login
 │   │   │   └── RegisterPage.jsx                  # Student registration portal
 │   │   │
-│   │   └── dashboard/                            # Student Portal Pages
-│   │       ├── ApplicationsPage.jsx              # Application history, tracking & status timeline
+│   │   ├── AdminLoginPage.jsx                    # Admin authentication portal
+│   │   ├── DashboardPage.jsx                     # Central student portal overview & action cards
+│   │   ├── LandingPage.jsx                       # Public homepage with live feature previews
+│   │   │
+│   │   └── dashboard/                            # Student Sub-Portal Pages
+│   │       ├── AssistantPage.jsx                 # ScholarAI Assistant with Voice Chat & Multilingual RAG
 │   │       ├── CertificateGeneratorPage.jsx      # 1-Click Certificate Generator & Profile AutoFill
-│   │       ├── ChatAdvisorPage.jsx               # AI Scholarship Counselor chat interface
 │   │       ├── DocumentsPage.jsx                 # Document repository, upload & OCR review modals
+│   │       ├── EligibilityPage.jsx               # AI Supervisor Agent workflow & status checker
+│   │       ├── HistoryPage.jsx                   # Application history, tracking & status timeline
+│   │       ├── InsightsPage.jsx                  # Analytics, deadline calendar & notification center
 │   │       ├── JourneyPage.jsx                   # End-to-end interactive scholarship application roadmap
 │   │       ├── ProfilePage.jsx                   # 16-parameter student profile editor
 │   │       ├── RecommendationsPage.jsx           # Scholarship recommendations, Google RPA trigger & Apply wizard
-│   │       └── StudentDashboardPage.jsx          # Overview dashboard with analytics & live suggestions
+│   │       ├── SavedPage.jsx                     # Bookmarked scholarships & side-by-side comparison
+│   │       └── SettingsPage.jsx                  # Student account preferences & security settings
 │   │
 │   ├── services/
-│   │   └── api.js                                # Central Axios client with auth interceptors
+│   │   ├── api.js                                # Central Axios client with auth interceptors
+│   │   ├── translationManager.js                 # Batch request queue, memory + localStorage cache
+│   │   └── voiceService.js                       # Web Speech API STT/TTS engine with speech cleaning
 │   │
 │   ├── App.jsx                                   # React Router routes & authentication guards
 │   ├── index.css                                 # Tailwind CSS styling, keyframe animations & themes
@@ -316,6 +403,8 @@ DATABASE_URL=mysql+pymysql://root:password@localhost:3306/scholarship_db
 BREVO_API_KEY=your_brevo_api_key
 BREVO_SENDER_EMAIL=your_verified_sender@domain.com
 BREVO_SENDER_NAME="ScholarAI Platform"
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
+CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
 ```
 
 Run backend server:
@@ -345,6 +434,8 @@ Open **`http://localhost:5173`** in your browser.
 | `POST` | `/api/v1/auth/register` | Register new student account | Public |
 | `POST` | `/api/v1/auth/login` | Authenticate user & issue JWT token | Public |
 | `GET` | `/api/v1/auth/google/login` | Initiate Google OAuth 2.0 flow | Public |
+| `POST` | `/api/v1/translate` | Batch dynamic translation via Cloudflare Workers AI | Public |
+| `POST` | `/api/v1/chat` | Multilingual conversational RAG assistant & counselor | JWT |
 | `GET` | `/api/v1/profile` | Get current student profile | JWT |
 | `PUT` | `/api/v1/profile` | Update 16-parameter student profile | JWT |
 | `POST` | `/api/v1/documents/upload` | Upload certificate & run Tesseract OCR | JWT |

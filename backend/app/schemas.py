@@ -152,6 +152,7 @@ class ApplicationUpdate(BaseModel):
 
 class ChatMessageCreate(BaseModel):
     message: str
+    language: Optional[str] = "en"
 
 class ChatMessageResponse(BaseModel):
     id: int
@@ -235,9 +236,12 @@ class AgentDecisionLogResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
+class TranslationRequest(BaseModel):
+    texts: List[str]
+    target_lang: str = "en"
+    source_lang: str = "en"
 
-
-
+class TranslationResponse(BaseModel):
+    translations: Dict[str, str]
+    target_lang: str

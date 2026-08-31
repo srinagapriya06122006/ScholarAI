@@ -16,6 +16,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
+import logging
+logger = logging.getLogger(__name__)
 from .database import engine, Base, get_db
 from . import crud, schemas, auth, models
 from .services import email_service
@@ -966,14 +968,15 @@ Uploaded Documents: {uploaded_docs_str}"""
         )
     extra_context = "\n---\n".join(db_scholarships)
 
-    # Step 3: Run the RAG response generator
+    # Step 3: Run the RAG response generator with user's selected language
     from .agent.rag_agent import generate_rag_response
     rag_res = generate_rag_response(
         msg_in.message,
         user_profile_summary=student_profile_text,
         extra_context=extra_context,
         db=db,
-        user_id=current_user.id
+        user_id=current_user.id,
+        language=getattr(msg_in, 'language', 'en') or 'en'
     )
     reply = rag_res["answer"]
     
@@ -1566,5 +1569,22 @@ def send_deadline_reminders(
         "recipients_count": dispatched_count
     }
 
-
-
+# ─────────────────────────────────────────────
+# Dynamic Multilingual Translation Endpoint
+# Powered by Cloudflare Workers AI + In-Memory Caching
+# ─────────────────────────────────────────────
+@app.post("/api/v1/translate", response_model=schemas.TranslationResponse)
+def translate_content(req: schemas.TranslationRequest):
+    """
+    Translates an array of text strings using Cloudflare Workers AI.
+    Results are cached in memory.
+    """
+    from .services.translation_service import translate_batch
+    target_lang = req.target_lang or "en"
+    source_lang = req.source_lang or "en"
+    
+    if target_lang == source_lang or target_lang == "en":
+        return {"translations": {t: t for t in req.texts}, "target_lang": target_lang}
+        
+    translations = translate_batch(req.texts, target_lang=target_lang, source_lang=source_lang)
+    return {"translations": translations, "target_lang": target_lang}

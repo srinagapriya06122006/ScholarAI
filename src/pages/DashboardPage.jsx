@@ -5,6 +5,8 @@ import { useToast } from '../components/Toast';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GlassCard } from '../components/GlassCard';
 import { AutopilotGuide } from '../components/AutopilotGuide';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../context/LanguageContext';
 import api from '../services/api';
 import {
   GraduationCap,
@@ -26,6 +28,7 @@ import {
 } from 'lucide-react';
 
 export const DashboardPage = () => {
+  const { t } = useLanguage();
   const { user, logout } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -88,35 +91,35 @@ export const DashboardPage = () => {
 
   const cards = [
     {
-      title: '👤 Student Profile',
-      description: 'Fill in details like Age, Religion, CGPA, Income, Category, and State to find matches.',
+      title: `👤 ${t('cardProfileTitle', 'Student Profile')}`,
+      description: t('cardProfileDesc', 'Fill in details like Age, Religion, CGPA, Income, Category, and State to find matches.'),
       icon: User,
       color: 'from-blue-500 to-indigo-500',
-      badge: `${stats.profile_completion}% Done`,
+      badge: `${stats.profile_completion}% ${t('done', 'Done')}`,
       badgeColor: 'bg-indigo-500/20 text-indigo-400',
       path: '/dashboard/profile'
     },
     {
-      title: '📄 Document Verification',
-      description: 'Upload transcripts, ID cards, and income proofs for OCR verification.',
+      title: `📄 ${t('cardDocsTitle', 'Document Verification')}`,
+      description: t('cardDocsDesc', 'Upload transcripts, ID cards, and income proofs for OCR verification.'),
       icon: FileText,
       color: 'from-violet-500 to-purple-500',
-      badge: `${stats.missing_documents.filter(d => d.status === 'Not Uploaded').length} Pending`,
+      badge: `${stats.missing_documents.filter(d => d.status === 'Not Uploaded').length} ${t('pending', 'Pending')}`,
       badgeColor: 'bg-rose-500/20 text-rose-400',
       path: '/dashboard/documents'
     },
     {
-      title: '🪄 Certificate Creator Agent',
-      description: 'Don\'t have original certificates? Generate template certificates and auto-verify them.',
+      title: `🪄 ${t('cardCertTitle', 'Certificate Creator Agent')}`,
+      description: t('cardCertDesc', "Don't have original certificates? Generate template certificates and auto-verify them."),
       icon: Wand2,
       color: 'from-pink-500 to-rose-500',
-      badge: 'Agentic Gen',
+      badge: t('agenticGen', 'Agentic Gen'),
       badgeColor: 'bg-pink-500/20 text-pink-400',
       path: '/dashboard/certificates'
     },
     {
-      title: '🧠 Eligibility Analysis',
-      description: 'Run eligibility analysis against your profile and rules (RAG).',
+      title: `🧠 ${t('cardEligibilityTitle', 'Eligibility Analysis')}`,
+      description: t('cardEligibilityDesc', 'Run eligibility analysis against your profile and rules (RAG).'),
       icon: Brain,
       color: 'from-emerald-500 to-teal-500',
       badge: stats.verification_status.ai_matching,
@@ -124,47 +127,47 @@ export const DashboardPage = () => {
       path: '/dashboard/eligibility'
     },
     {
-      title: '🎓 AI Recommendations',
-      description: 'View ranked recommendations with detailed eligibility matches.',
+      title: `🎓 ${t('cardRecoTitle', 'AI Recommendations')}`,
+      description: t('cardRecoDesc', 'View ranked recommendations with detailed eligibility matches.'),
       icon: Award,
       color: 'from-amber-500 to-orange-500',
-      badge: `${stats.eligible_count + stats.partially_eligible_count} Matches`,
+      badge: `${stats.eligible_count + stats.partially_eligible_count} ${t('matches', 'Matches')}`,
       badgeColor: 'bg-slate-500/20 text-slate-400',
       path: '/dashboard/recommendations'
     },
     {
-      title: '📊 AI Insights',
-      description: 'Explore dynamic AI scholarship analytics, deadlines assistant, and personal notifications.',
+      title: `📊 ${t('cardInsightsTitle', 'AI Insights')}`,
+      description: t('cardInsightsDesc', 'Explore dynamic AI scholarship analytics, deadlines assistant, and personal notifications.'),
       icon: TrendingUp,
       color: 'from-sky-500 to-indigo-500',
-      badge: 'Interactive',
+      badge: t('interactive', 'Interactive'),
       badgeColor: 'bg-sky-500/20 text-sky-400',
       path: '/dashboard/insights'
     },
     {
-      title: '🤖 ScholarAI Assistant',
-      description: 'Chat with ScholarAI to ask questions about eligibility, improvements, and deadlines.',
+      title: `🤖 ${t('cardAssistantTitle', 'ScholarAI Assistant')}`,
+      description: t('cardAssistantDesc', 'Chat with ScholarAI to ask questions about eligibility, improvements, and deadlines.'),
       icon: Brain,
       color: 'from-cyan-500 to-blue-500',
-      badge: 'Online',
+      badge: t('online', 'Online'),
       badgeColor: 'bg-emerald-500/20 text-emerald-400',
       path: '/dashboard/assistant'
     },
     {
-      title: '⏱️ Application History',
-      description: 'Track and monitor your submitted scholarship applications with complete verification status.',
+      title: `⏱️ ${t('cardAppHistTitle', 'Application History')}`,
+      description: t('cardAppHistDesc', 'Track and monitor your submitted scholarship applications with complete verification status.'),
       icon: ClipboardList,
       color: 'from-emerald-500 to-teal-500',
-      badge: 'History',
+      badge: t('history', 'History'),
       badgeColor: 'bg-emerald-500/20 text-emerald-400',
       path: '/dashboard/applications'
     },
     {
-      title: '🚀 Scholarship Journey',
-      description: 'Stateful Supervisor Agent coordinating validation, eligibility, OCR extraction, and profile auditing.',
+      title: `🚀 ${t('cardJourneyTitle', 'Scholarship Journey')}`,
+      description: t('cardJourneyDesc', 'Stateful Supervisor Agent coordinating validation, eligibility, OCR extraction, and profile auditing.'),
       icon: Compass,
       color: 'from-blue-600 to-indigo-600',
-      badge: 'Agentic Flow',
+      badge: t('agenticFlow', 'Agentic Flow'),
       badgeColor: 'bg-sky-500/20 text-sky-400',
       path: '/dashboard/journey'
     }
@@ -179,7 +182,7 @@ export const DashboardPage = () => {
       <div className="absolute bottom-[5%] right-[-5%] w-[500px] h-[500px] rounded-full bg-indigo-400/10 blur-[120px] pointer-events-none animate-pulse-slow"></div>
 
       {/* Navigation Header */}
-      <nav className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between relative z-10">
+      <nav className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between relative z-50">
         <div className="flex items-center gap-2">
           <Link to="/" className="p-2 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-500/25 flex items-center">
             <GraduationCap className="w-6 h-6" />
@@ -190,13 +193,13 @@ export const DashboardPage = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <LanguageSelector />
           <ThemeToggle />
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-rose-500/35 hover:bg-rose-500/10 text-rose-500 font-semibold text-sm transition-all focus:outline-none"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-rose-500/35 hover:bg-rose-500/10 text-rose-500 font-semibold text-sm transition-all focus:outline-none cursor-pointer"
           >
-            
-            <LogOut className="w-4.5 h-4.5" /> Logout
+            <LogOut className="w-4.5 h-4.5" /> {t('logout', 'Logout')}
           </button>
         </div>
       </nav>
@@ -207,10 +210,10 @@ export const DashboardPage = () => {
         {/* Welcome Banner */}
         <div className="mb-8 animate-slide-up">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-            Welcome, <span className="bg-clip-text text-transparent bg-gradient-to-r from-sky-500 to-indigo-500">{user?.fullName || 'Student'}</span> <Sparkles className="w-6 h-6 text-sky-500 animate-pulse" />
+            {t('welcome', 'Welcome')}, <span className="bg-clip-text text-transparent bg-gradient-to-r from-sky-500 to-indigo-500">{user?.fullName || 'Student'}</span> <Sparkles className="w-6 h-6 text-sky-500 animate-pulse" />
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Manage your academic profile, verify documents, and explore personalized AI scholarship advice.
+            {t('dashboardSubtitle', 'Manage your academic profile, verify documents, and explore personalized AI scholarship advice.')}
           </p>
         </div>
 
@@ -221,7 +224,7 @@ export const DashboardPage = () => {
         {stats.mismatches && stats.mismatches.length > 0 && (
           <div className="mb-8 p-5 rounded-2xl bg-rose-500/10 border border-rose-500/20 animate-slide-up">
             <h3 className="text-sm font-bold text-rose-500 uppercase tracking-wider flex items-center gap-2 mb-3">
-              <span>⚠️</span> Verification Warning: Document Mismatches Detected
+              <span>⚠️</span> {t('mismatchWarning', 'Verification Warning: Document Mismatches Detected')}
             </h3>
             <div className="space-y-2">
               {stats.mismatches.map((m, idx) => (
@@ -234,7 +237,7 @@ export const DashboardPage = () => {
               to="/dashboard/eligibility"
               className="inline-block mt-4 text-xs font-bold text-rose-500 hover:underline"
             >
-              Correct details & Re-run Verification →
+              {t('correctDetails', 'Correct details & Re-run Verification →')}
             </Link>
           </div>
         )}
@@ -244,38 +247,38 @@ export const DashboardPage = () => {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 mb-8 animate-slide-up">
           <GlassCard className="border border-white/20 flex flex-col justify-between py-6">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Total Scholarships</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{t('totalScholarships', 'Total Scholarships')}</span>
             <span className="text-3xl font-black text-slate-950 dark:text-white">{stats.total_scholarships || 54}</span>
-            <p className="text-[10px] text-slate-500 dark:text-slate-500 font-medium mt-2">Active database schemes</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-500 font-medium mt-2">{t('activeDatabaseSchemes', 'Active database schemes')}</p>
           </GlassCard>
 
           <GlassCard className="border border-white/20 flex flex-col justify-between py-6">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Eligible</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{t('eligible', 'Eligible')}</span>
             <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
               {stats.eligible_count === 0 && stats.rejected_count === 0 ? '—' : stats.eligible_count}
             </span>
             <p className="text-[10px] text-slate-500 dark:text-slate-500 font-medium mt-2">
-              {stats.eligible_count === 0 && stats.rejected_count === 0 ? 'Complete profile to calculate' : 'Fully verified & satisfied'}
+              {stats.eligible_count === 0 && stats.rejected_count === 0 ? t('completeProfile', 'Complete profile to calculate') : t('fullyVerified', 'Fully verified & satisfied')}
             </p>
           </GlassCard>
 
           <GlassCard className="border border-white/20 flex flex-col justify-between py-6">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Not Eligible</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{t('notEligible', 'Not Eligible')}</span>
             <span className="text-3xl font-black text-rose-600 dark:text-rose-400">
               {stats.eligible_count === 0 && stats.rejected_count === 0 ? '—' : stats.rejected_count}
             </span>
             <p className="text-[10px] text-slate-500 dark:text-slate-500 font-medium mt-2">
-              {stats.eligible_count === 0 && stats.rejected_count === 0 ? 'Complete profile to calculate' : 'Eligibility criteria not met'}
+              {stats.eligible_count === 0 && stats.rejected_count === 0 ? t('completeProfile', 'Complete profile to calculate') : t('criteriaNotMet', 'Eligibility criteria not met')}
             </p>
           </GlassCard>
 
           <GlassCard className="border border-white/20 flex flex-col justify-between py-6">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Pending / Evaluation</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{t('pendingEvaluation', 'Pending / Evaluation')}</span>
             <span className="text-3xl font-black text-amber-600 dark:text-amber-400">
               {stats.pending_count !== undefined ? stats.pending_count : 0}
             </span>
             <p className="text-[10px] text-slate-500 dark:text-slate-500 font-medium mt-2">
-              {stats.pending_count > 0 ? 'Awaiting required profile inputs' : 'All criteria evaluated'}
+              {stats.pending_count > 0 ? t('awaitingProfile', 'Awaiting required profile inputs') : t('allEvaluated', 'All criteria evaluated')}
             </p>
           </GlassCard>
         </div>
@@ -283,7 +286,7 @@ export const DashboardPage = () => {
 
         {/* Action Grid Section */}
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-6 flex items-center gap-2">
-          <ClipboardList className="w-4 h-4 text-sky-500" /> Dashboard Portal Actions
+          <ClipboardList className="w-4 h-4 text-sky-500" /> {t('dashboardPortalActions', 'Dashboard Portal Actions')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6 animate-slide-up">
           {cards.map((card, i) => {
@@ -311,7 +314,7 @@ export const DashboardPage = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs font-bold text-sky-600 dark:text-sky-400 mt-5">
-                  Open Action <ChevronRight className="w-3.5 h-3.5" />
+                  {t('openAction', 'Open Action')} <ChevronRight className="w-3.5 h-3.5" />
                 </div>
               </div>
             );
@@ -321,7 +324,7 @@ export const DashboardPage = () => {
 
       {/* Footer */}
       <footer className="w-full py-6 text-center text-xs text-slate-500 border-t border-slate-300/30 dark:border-slate-800/30 z-10 relative">
-        <p>© {new Date().getFullYear()} ScholarAI. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} ScholarAI. {t('footerRights', 'All rights reserved.')}</p>
       </footer>
     </div>
   );
