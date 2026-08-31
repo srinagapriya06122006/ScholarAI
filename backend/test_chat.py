@@ -113,7 +113,7 @@ Behavior Rules:
     print("---------------------------------")
     
     api_key = os.environ.get("GEMINI_API_KEY", "")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={api_key}"
     data = {
         "contents": [
             {

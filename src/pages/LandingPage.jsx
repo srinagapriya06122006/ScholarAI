@@ -17,11 +17,8 @@ import {
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useAuth } from '../hooks/useAuth';
-import { LanguageSelector } from '../components/LanguageSelector';
-import { useLanguage } from '../context/LanguageContext';
 
 export const LandingPage = () => {
-  const { t } = useLanguage();
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -121,25 +118,24 @@ export const LandingPage = () => {
           <div className="flex items-center gap-6 lg:gap-8 shrink-0">
             <div className="hidden md:flex items-center gap-6 lg:gap-8">
               <a href="#how-it-works" className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors">
-                {t('howItWorks', 'How It Works')}
+                How It Works
               </a>
               <a href="#agents" className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors">
-                {t('meetTheAgents', 'Meet the Agents')}
+                Meet the Agents
               </a>
               <a href="#features" className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors">
-                {t('features', 'Features')}
+                Features
               </a>
             </div>
 
             <div className="flex items-center gap-3.5 sm:gap-4">
-              <LanguageSelector />
               <ThemeToggle />
               {user ? (
                 <Link
                   to="/dashboard"
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white hover:opacity-95 shadow-md shadow-sky-500/20 font-bold text-sm transition-all flex items-center gap-2 cursor-pointer"
                 >
-                  {t('dashboard', 'Dashboard')} <ArrowRight className="w-4 h-4" />
+                  Dashboard <ArrowRight className="w-4 h-4" />
                 </Link>
               ) : (
                 <div className="hidden sm:flex items-center gap-2.5">
@@ -147,13 +143,13 @@ export const LandingPage = () => {
                     to="/login"
                     className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-800 dark:text-slate-200 font-semibold text-sm transition-all cursor-pointer"
                   >
-                    {t('login', 'Login')}
+                    Login
                   </Link>
                   <Link
                     to="/register"
                     className="px-4.5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white hover:opacity-95 shadow-md shadow-sky-500/20 font-bold text-sm transition-all flex items-center gap-1.5 cursor-pointer"
                   >
-                    {t('register', 'Register')} <ArrowRight className="w-4 h-4" />
+                    Register <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
               )}
@@ -178,21 +174,21 @@ export const LandingPage = () => {
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 py-1"
             >
-              {t('howItWorks', 'How It Works')}
+              How It Works
             </a>
             <a
               href="#agents"
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 py-1"
             >
-              {t('meetTheAgents', 'Meet the Agents')}
+              Meet the Agents
             </a>
             <a
               href="#features"
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 py-1"
             >
-              {t('features', 'Features')}
+              Features
             </a>
             {!user && (
               <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
@@ -200,13 +196,13 @@ export const LandingPage = () => {
                   to="/login"
                   className="flex-1 text-center py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs"
                 >
-                  {t('login', 'Login')}
+                  Login
                 </Link>
                 <Link
                   to="/register"
                   className="flex-1 text-center py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-bold text-xs"
                 >
-                  {t('register', 'Register')}
+                  Register
                 </Link>
               </div>
             )}
@@ -234,20 +230,20 @@ export const LandingPage = () => {
           
           {/* 1. Small Top Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900/85 dark:bg-slate-900/90 backdrop-blur-md border border-sky-400/40 text-sky-300 dark:text-sky-400 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-2.5 shadow-xl">
-            <span>✦</span> {t('poweredByAgents', 'POWERED BY AUTONOMOUS AI AGENTS')}
+            <span>✦</span> POWERED BY AUTONOMOUS AI AGENTS
           </div>
           
           {/* 2. Main Centered Heading - ONE SINGLE LINE */}
           <h1 className="text-sm sm:text-lg md:text-xl lg:text-2xl xl:text-[2.15rem] font-black tracking-tight leading-tight mb-2 text-center drop-shadow-lg max-w-6xl whitespace-normal sm:whitespace-nowrap">
-            <span className="text-white">{t('heroHeadingStart', 'AGENTIC AI SCHOLARSHIP ')}</span>
+            <span className="text-white">AGENTIC AI SCHOLARSHIP </span>
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-cyan-300 to-indigo-400">
-              {t('heroHeadingEnd', 'DISCOVERY & VERIFICATION PLATFORM')}
+              DISCOVERY & VERIFICATION PLATFORM
             </span>
           </h1>
           
           {/* 3. Centered 1-2 Line Description */}
           <p className="text-xs sm:text-sm text-slate-200 dark:text-slate-300 max-w-xl mx-auto leading-relaxed font-medium drop-shadow text-center">
-            {t('heroDescription', 'AI agents match students with eligible scholarships, verify documents, and guide them through the application process.')}
+            AI agents match students with eligible scholarships, verify documents, and guide them through the application process.
           </p>
         </div>
       </section>
@@ -255,9 +251,9 @@ export const LandingPage = () => {
       {/* How ScholarAI Works Section */}
       <section id="how-it-works" className="relative z-10 px-6 max-w-7xl mx-auto w-full py-16 border-t border-slate-300/20 dark:border-slate-800/20">
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight mb-4">{t('howItWorksTitle', 'How ScholarAI Works')}</h2>
+          <h2 className="text-3xl font-bold tracking-tight mb-4">How ScholarAI Works</h2>
           <p className="text-slate-600 dark:text-slate-400">
-            {t('howItWorksSubtitle', 'From registration to recommended plans, our agentic workflow removes manual filters and replaces them with direct guidance.')}
+            From registration to recommended plans, our agentic workflow removes manual filters and replaces them with direct guidance.
           </p>
         </div>
 
@@ -267,8 +263,8 @@ export const LandingPage = () => {
               <span className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-indigo-500 opacity-60 absolute top-4 right-4">
                 {step.number}
               </span>
-              <h3 className="text-lg font-bold mb-3 mt-6 text-slate-800 dark:text-slate-200">{t(`stepTitle${i+1}`, step.title)}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{t(`stepDesc${i+1}`, step.description)}</p>
+              <h3 className="text-lg font-bold mb-3 mt-6 text-slate-800 dark:text-slate-200">{step.title}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{step.description}</p>
             </div>
           ))}
         </div>
@@ -277,9 +273,9 @@ export const LandingPage = () => {
       {/* Meet the AI Agents Section */}
       <section id="agents" className="relative z-10 px-6 max-w-7xl mx-auto w-full py-16 border-t border-slate-300/20 dark:border-slate-800/20">
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight mb-4">{t('meetAgentsTitle', 'Meet Your AI Agents')}</h2>
+          <h2 className="text-3xl font-bold tracking-tight mb-4">Meet Your AI Agents</h2>
           <p className="text-slate-600 dark:text-slate-400">
-            {t('meetAgentsSubtitle', 'Our platform operates with multiple specialized agents acting collaboratively to build your personalized plan.')}
+            Our platform operates with multiple specialized agents acting collaboratively to build your personalized plan.
           </p>
         </div>
 
@@ -292,9 +288,9 @@ export const LandingPage = () => {
                   <div className={`p-3 rounded-xl bg-gradient-to-tr ${agent.color} text-white w-fit mb-6 shadow-md`}>
                     <IconComponent className="w-6 h-6" />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">{t(`agentName${i+1}`, agent.name)}</h3>
-                  <p className="text-xs font-semibold text-sky-500 uppercase tracking-wider mb-4">{t(`agentRole${i+1}`, agent.role)}</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{t(`agentDesc${i+1}`, agent.description)}</p>
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">{agent.name}</h3>
+                  <p className="text-xs font-semibold text-sky-500 uppercase tracking-wider mb-4">{agent.role}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{agent.description}</p>
                 </div>
               </div>
             );
@@ -305,35 +301,35 @@ export const LandingPage = () => {
       {/* Features Section */}
       <section id="features" className="relative z-10 px-6 max-w-7xl mx-auto w-full py-16 border-t border-slate-300/20 dark:border-slate-800/20">
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight mb-4">{t('featuresTitle', 'Powerful Features')}</h2>
+          <h2 className="text-3xl font-bold tracking-tight mb-4">Powerful Features</h2>
           <p className="text-slate-600 dark:text-slate-400">
-            {t('featuresSubtitle', 'Intelligent features built to streamline documents, eligibility analysis, and application pipelines.')}
+            Intelligent features built to streamline documents, eligibility analysis, and application pipelines.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="glass-panel p-6 rounded-2xl border border-white/20">
             <h3 className="text-lg font-bold mb-3 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-sky-500" /> {t('featureDocTitle', 'Document Verification')}
+              <CheckCircle className="w-5 h-5 text-sky-500" /> Document Verification
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              {t('featureDocDesc', 'Verify your marksheets, caste, and income certificates using smart OCR and database checks to verify compliance.')}
+              Verify your marksheets, caste, and income certificates using smart OCR and database checks to verify compliance.
             </p>
           </div>
           <div className="glass-panel p-6 rounded-2xl border border-white/20">
             <h3 className="text-lg font-bold mb-3 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-sky-500" /> {t('featureAiTitle', 'AI Conversational Assistant')}
+              <MessageSquare className="w-5 h-5 text-sky-500" /> AI Conversational Assistant
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              {t('featureAiDesc', 'Ask specific questions about scholarship rules, deadlines, or document formats, and get RAG-driven answers.')}
+              Ask specific questions about scholarship rules, deadlines, or document formats, and get RAG-driven answers.
             </p>
           </div>
           <div className="glass-panel p-6 rounded-2xl border border-white/20">
             <h3 className="text-lg font-bold mb-3 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-sky-500" /> {t('featureMatchTitle', 'Matches with Explanations')}
+              <Sparkles className="w-5 h-5 text-sky-500" /> Matches with Explanations
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              {t('featureMatchDesc', 'See exact reasons why you qualified or didn\'t qualify for a scholarship, explained in clear, natural language.')}
+              See exact reasons why you qualified or didn't qualify for a scholarship, explained in clear, natural language.
             </p>
           </div>
         </div>

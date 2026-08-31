@@ -306,39 +306,81 @@ def search_knowledge_base(query: str, top_k: int = 3) -> List[Dict]:
     return results if results else KNOWLEDGE_BASE[:top_k]
 
 
-def call_gemini_api(prompt: str) -> str:
-    """Call Google Gemini REST API with prompt grounding."""
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key:
+def _call_cloudflare_ai(prompt: str) -> str:
+    """Fallback LLM via Cloudflare Workers AI Llama 3.1 8B."""
+    account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+    api_token = os.getenv("CLOUDFLARE_API_TOKEN")
+    if not account_id or not api_token:
         return ""
-    gemini_models = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"]
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048}
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/llama-3.1-8b-instruct"
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Content-Type": "application/json"
     }
-    for m in gemini_models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            import ssl
-            ctx = ssl._create_unverified_context()
-            with urllib.request.urlopen(req, timeout=20, context=ctx) as response:
-                res_data = json.loads(response.read().decode("utf-8"))
-                candidates = res_data.get("candidates", [])
-                if candidates:
-                    text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                    if text_content.strip():
-                        return text_content.strip()
-        except urllib.error.HTTPError as err:
-            print(f"[Gemini API HTTPError {m}]: {err.code} - {err.read().decode('utf-8', errors='ignore')[:200]}")
-            continue
-        except Exception as err:
-            print(f"[Gemini API Exception {m}]: {err}")
-            continue
+    payload = {
+        "messages": [
+            {"role": "system", "content": "You are ScholarAI, an expert AI scholarship advisor and general assistant for students. Provide direct, helpful, and concise answers."},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 1024,
+        "temperature": 0.2
+    }
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode("utf-8"))
+                result_text = data.get("result", {}).get("response", "")
+                if result_text and result_text.strip():
+                    return result_text.strip()
+    except Exception as e:
+        print(f"[Cloudflare AI Fallback Warning]: {e}")
+    return ""
+
+
+def call_gemini_api(prompt: str) -> str:
+    """Call Google Gemini REST API with prompt grounding and Cloudflare AI fallback."""
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if api_key:
+        gemini_models = [
+            "gemini-flash-lite-latest",
+            "gemini-flash-latest",
+            "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+        ]
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048}
+        }
+        for m in gemini_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                import ssl
+                ctx = ssl._create_unverified_context()
+                with urllib.request.urlopen(req, timeout=8, context=ctx) as response:
+                    res_data = json.loads(response.read().decode("utf-8"))
+                    candidates = res_data.get("candidates", [])
+                    if candidates:
+                        text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if text_content.strip():
+                            return text_content.strip()
+            except urllib.error.HTTPError as err:
+                print(f"[Gemini API HTTPError {m}]: {err.code} - {err.read().decode('utf-8', errors='ignore')[:200]}")
+                continue
+            except Exception as err:
+                print(f"[Gemini API Exception {m}]: {err}")
+                continue
+
+    # Fallback to Cloudflare Workers AI if Gemini is unavailable
+    cf_res = _call_cloudflare_ai(prompt)
+    if cf_res:
+        return cf_res
+
     return ""
 
 
@@ -348,7 +390,9 @@ def _format_amt(amt) -> str:
     if isinstance(amt, (int, float)):
         return f"₹{amt:,.0f}" if amt == int(amt) else f"₹{amt:,.2f}"
     s = str(amt).replace('â‚¹', '₹').replace('â€“', '-').replace('Rs.', '₹').strip()
-    return s if s.startswith('₹') else f"₹{s}"
+    if '₹' in s or s.lower().startswith('varies'):
+        return s
+    return f"₹{s}"
 
 
 def _get_numeric_amount(amt) -> float:
@@ -385,8 +429,8 @@ def _get_deadline_urgency(deadline_str: str) -> tuple:
 
 def _get_official_url(match: dict, s_obj=None) -> str:
     """Return the official URL from the scholarship DB record, or best-effort from known providers."""
-    if s_obj and s_obj.official_url and s_obj.official_url.strip():
-        return s_obj.official_url.strip()
+    if s_obj and getattr(s_obj, "official_url", None) and str(s_obj.official_url).strip():
+        return str(s_obj.official_url).strip()
     name_lower = match.get("scholarship_name", "").lower()
     provider_lower = (match.get("provider") or "").lower()
     for key, url in PROVIDER_URLS.items():
@@ -397,8 +441,8 @@ def _get_official_url(match: dict, s_obj=None) -> str:
 
 def _get_scholarship_documents(scholarship_name: str, s_obj=None) -> List[str]:
     """Return the specific required documents for this scholarship."""
-    if s_obj and s_obj.required_documents and s_obj.required_documents.strip():
-        raw = s_obj.required_documents.strip()
+    if s_obj and getattr(s_obj, "required_documents", None) and str(s_obj.required_documents).strip():
+        raw = str(s_obj.required_documents).strip()
         docs = [d.strip() for d in raw.split(",") if d.strip()]
         if docs:
             return docs
@@ -428,7 +472,7 @@ def _build_sources_section(matches: list, db=None) -> str:
 # ─────────────────────────────────────────────
 # Main RAG Response Generator
 def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", extra_context: str = "", db: Session = None, user_id: int = None) -> Dict:
-    """Routes queries to structured intent responses or Gemini fallback in English."""
+    """Routes queries to structured crisp intent responses or Gemini fallback in English."""
     q_lower = user_query.lower()
     today_str = date.today().strftime("%d %b %Y")
 
@@ -437,66 +481,60 @@ def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", e
         if db and user_id:
             from .matching_agent import ScholarshipMatchingAgent
             matches = ScholarshipMatchingAgent(db).match_scholarships(user_id)
-            profile = crud.get_user_profile(db, user_id)
 
             eligible = [m for m in matches if m["status"] == "Eligible"]
             partial = [m for m in matches if m["status"] == "Partially Eligible"]
-            rejected = [m for m in matches if m["status"] == "Rejected"]
 
-            message = "✔ Profile checked\n✔ All scholarship criteria evaluated\n\n"
-            message += f"**Based on your current profile, you appear eligible for {len(eligible)} scholarship(s)**"
-            if partial:
-                message += f" and potentially eligible for {len(partial)} more."
-            message += "\n\n"
+            if not eligible and not partial:
+                message = "🎯 **Result**\nNo eligible scholarships matched your current profile.\n\n"
+                message += "💡 **Next Steps**\nComplete your profile (CGPA, Income, Category) and upload required certificates to unlock matches.\n\n"
+                message += "📌 **Note**\nFinal eligibility must be confirmed by the scholarship authority.\n\n[Edit Profile →] [Upload Documents →]"
+                return {"answer": message, "citations": [], "confidence": "HIGH"}
 
-            # Eligible scholarships
-            for m in eligible:
-                s_obj = db.query(models.Scholarship).filter(models.Scholarship.id == m["id"]).first()
-                emoji, urgency_label, _ = _get_deadline_urgency(m["deadline"])
-                message += f"**{m['scholarship_name']}** — 🎯 Match: {m['match_percentage']}%\n"
-                for r in m["reasons"]:
-                    message += f"  {r}\n"
-                message += f"  💰 Funding: {_format_amt(m['amount'])} | {emoji} Deadline: {m['deadline']} ({urgency_label})\n\n"
+            message = f"🎯 **Result**\nYou appear eligible for **{len(eligible)} scholarship{'s' if len(eligible) != 1 else ''}**.\n\n"
+            message += "You're eligible because your academic performance, degree, income, and required profile criteria match the scholarship requirements.\n\n"
 
-            # Partially eligible
-            if partial:
-                message += "**Potentially Eligible (additional verification needed):**\n"
-                for m in partial:
-                    message += f"  • {m['scholarship_name']} — Match: {m['match_percentage']}%\n"
+            if eligible:
+                top = eligible[0]
+                dl = top.get("deadline") or "Not verified"
+                message += f"🏆 **Top Match**\n**{top['scholarship_name']} — {top['match_percentage']}%**\n"
+                message += f"* Funding: {_format_amt(top['amount'])}\n"
+                message += f"* Deadline: {dl}\n"
+                message += f"* Reason: Strong match with your profile\n\n"
+
+                if len(eligible) > 1:
+                    message += "⭐ **Other Matches**\n"
+                    for m in eligible[1:4]:
+                        message += f"* {m['scholarship_name']} — {m['match_percentage']}%\n"
+                    message += "\n"
+
+            if partial and len(eligible) < 2:
+                message += "⏳ **Pending Verification**\n"
+                for m in partial[:2]:
+                    message += f"* {m['scholarship_name']} — {m['match_percentage']}%\n"
                 message += "\n"
 
-            # Ineligible breakdown
-            if rejected:
-                message += "**Not Eligible:**\n"
-                for m in rejected:
-                    failed = [r for r in m["reasons"] if r.startswith("❌")]
-                    message += f"  • {m['scholarship_name']}: {failed[0] if failed else 'Criteria not met'}\n"
-                message += "\n"
+            message += "📌 **Note**\nFinal eligibility must be confirmed by the scholarship authority.\n\n"
+            message += "[View Eligible Scholarships →] [Upload Documents →]"
 
-            message += "⚠ Eligibility is based on profile data currently available in ScholarAI. Final eligibility is determined by the respective scholarship authority.\n\n"
-            message += _build_sources_section(eligible + partial, db)
-            message += "\n[View Eligible Scholarships →] [Upload Documents →]"
-
-            return {"answer": message, "citations": [{"title": m["scholarship_name"], "id": m["id"]} for m in eligible], "confidence": "HIGH"}
+            return {"answer": message, "citations": [{"title": m["scholarship_name"], "id": m["id"]} for m in eligible[:5]], "confidence": "HIGH"}
 
     # ─── INTENT 2: Compare scholarships ─────────────────────────────────────
     if "compare" in q_lower and "scholarship" in q_lower:
         if db and user_id:
             from .matching_agent import ScholarshipMatchingAgent
             matches = ScholarshipMatchingAgent(db).match_scholarships(user_id)
+            top_matches = matches[:5]
 
-            message = "✔ Scholarship database searched\n✔ Profile matched against all schemes\n\n"
-            message += "Here is the detailed comparison of available scholarships:\n\n"
-
-            message += "| Scholarship | Match | Amount | Deadline | Status |\n"
+            message = "🎯 **Scholarship Comparison**\n\n"
+            message += "| Scholarship | Match | Funding | Deadline | Status |\n"
             message += "| --- | --- | --- | --- | --- |\n"
-            for m in matches:
-                emoji, _, _ = _get_deadline_urgency(m["deadline"])
-                message += f"| {m['scholarship_name']} | {m['match_percentage']}% | {_format_amt(m['amount'])} | {emoji} {m['deadline']} | {m['status']} |\n"
+            for m in top_matches:
+                dl = m.get("deadline") or "Not verified"
+                message += f"| {m['scholarship_name']} | {m['match_percentage']}% | {_format_amt(m['amount'])} | {dl} | {m['status']} |\n"
 
-            message += "\n"
-            message += _build_sources_section(matches[:3], db)
-            message += "\n[View Eligible Scholarships →]"
+            message += "\n📌 **Note**\nFinal eligibility must be confirmed by the scholarship authority.\n\n"
+            message += "[View Eligible Scholarships →]"
             return {"answer": message, "citations": [], "confidence": "HIGH"}
 
     # ─── INTENT 3: Deadline reminder ────────────────────────────────────────
@@ -506,21 +544,19 @@ def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", e
             matches = ScholarshipMatchingAgent(db).match_scholarships(user_id)
             eligible_matches = [m for m in matches if m["status"] in ("Eligible", "Partially Eligible")]
 
-            message = "✔ Scholarship database searched\n\n"
-            message += "**Upcoming Scholarship Deadlines (your eligible schemes):**\n\n"
+            if not eligible_matches:
+                message = "⏰ **Deadline Reminder**\nNo active deadlines for eligible scholarships at this time.\n\n"
+                message += "[View Eligible Scholarships →]"
+                return {"answer": message, "citations": [], "confidence": "HIGH"}
 
             sorted_matches = sorted(eligible_matches, key=lambda m: _get_deadline_urgency(m["deadline"])[2])
-            for m in sorted_matches:
-                emoji, urgency_label, _ = _get_deadline_urgency(m["deadline"])
-                message += f"{emoji} **{m['scholarship_name']}** — {m['deadline']} ({urgency_label})\n"
+            message = "⏰ **Upcoming Deadlines**\n\n"
+            for m in sorted_matches[:5]:
+                dl = m.get("deadline") or "Not verified"
+                message += f"* **{m['scholarship_name']}**: {dl}\n"
 
-            if not sorted_matches:
-                message += "No eligible scholarships found with upcoming deadlines.\n"
-
-            message += f"\n🔴 = Urgent (< 7 days)  🟡 = Soon (< 30 days)  🟢 = Ample time  ⚫ = Expired\n"
-            message += f"\nDeadline data sourced from ScholarAI database. Last verified: {today_str}\n\n"
-            message += _build_sources_section(eligible_matches[:3], db)
-            message += "\n[View Eligible Scholarships →]"
+            message += "\n📌 **Note**\nSubmit applications early to avoid last-minute portal issues.\n\n"
+            message += "[View Eligible Scholarships →]"
             return {"answer": message, "citations": [], "confidence": "HIGH"}
 
     # ─── INTENT 4: Improve my profile ───────────────────────────────────────
@@ -528,9 +564,7 @@ def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", e
         if db and user_id:
             profile = crud.get_user_profile(db, user_id)
             cgpa = profile.cgpa or 0.0
-            income = profile.annualIncome
 
-            # Calculate scholarship eligibility completeness (only required fields)
             elig_required = {
                 "CGPA": profile.cgpa is not None,
                 "Annual Income": profile.annualIncome is not None,
@@ -542,86 +576,41 @@ def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", e
             elig_filled = sum(elig_required.values())
             elig_pct = int((elig_filled / len(elig_required)) * 100)
 
-            # Optional profile fields
-            optional_missing = []
-            if not profile.mobileNumber:
-                optional_missing.append("Mobile Number")
-
-            # Documents
             docs = db.query(models.Document).filter(models.Document.user_id == user_id).all()
             uploaded_doc_types = [d.document_type for d in docs]
             all_req_docs = ["aadhaar", "income", "community", "college", "tenth", "twelfth"]
             missing_docs = [d.title() for d in all_req_docs if d not in uploaded_doc_types]
 
-            message = "✔ Profile analysed\n\n"
-            message += f"**Scholarship Eligibility Profile: {elig_pct}%**\n"
-            for field, present in elig_required.items():
-                message += f"  {'✔' if present else '✗'} {field}\n"
-            message += "\n"
-
-            if optional_missing:
-                message += f"**Optional profile fields not yet filled:** {', '.join(optional_missing)}\n"
-                message += "These are not required for eligibility but may be needed for applications.\n\n"
-
-            message += "**Areas to improve:**\n\n"
-            if cgpa < 9.0:
-                message += f"• CGPA: Currently {cgpa}. Maintaining 9.0+ strengthens eligibility for high-value schemes.\n"
+            message = f"🎯 **Profile Completeness: {elig_pct}%**\n\n"
+            message += "**Recommendations:**\n"
             if missing_docs:
-                message += f"• Documents: Upload missing — {', '.join(missing_docs)}.\n"
-            else:
-                message += "• Documents: All required documents uploaded. ✔\n"
+                message += f"* **Upload Documents**: {', '.join(missing_docs[:3])}\n"
+            if cgpa < 9.0:
+                message += "* **Academic Score**: Maintaining 9.0+ CGPA qualifies for top merit schemes\n"
+            if elig_pct < 100:
+                missing_fields = [k for k, v in elig_required.items() if not v]
+                message += f"* **Complete Profile**: Fill in {', '.join(missing_fields)}\n"
+            if elig_pct == 100 and not missing_docs:
+                message += "* Profile is complete and ready for applications!\n"
 
-            message += "\n[Edit Profile →] [Upload Documents →]"
+            message += "\n📌 **Note**\nVerified documents help unlock higher matching accuracy.\n\n"
+            message += "[Edit Profile →] [Upload Documents →]"
             return {"answer": message, "citations": [], "confidence": "HIGH"}
 
     # ─── INTENT 5: Required documents ───────────────────────────────────────
     if any(p in q_lower for p in ["required documents", "required document", "what documents", "documents needed", "which documents"]):
-        if db and user_id:
-            from .matching_agent import ScholarshipMatchingAgent
-            matches = ScholarshipMatchingAgent(db).match_scholarships(user_id)
-            eligible_matches = [m for m in matches if m["status"] in ("Eligible", "Partially Eligible")]
-
-            message = "✔ Verification guidelines checked\n\n"
-
-            if eligible_matches:
-                message += "**Required documents per eligible scholarship:**\n\n"
-                for m in eligible_matches:
-                    s_obj = db.query(models.Scholarship).filter(models.Scholarship.id == m["id"]).first()
-                    docs = _get_scholarship_documents(m["scholarship_name"], s_obj)
-                    message += f"**{m['scholarship_name']}**\n"
-                    for doc in docs:
-                        message += f"  ✔ {doc}\n"
-                    message += "\n"
-            else:
-                # Generic fallback
-                message += "**General documents required for most scholarship applications:**\n\n"
-                message += "• Aadhaar Card — Must clearly show full name, DOB, gender, and state.\n"
-                message += "• Income Certificate — Issued by Revenue Department (Tahsildar) with annual income.\n"
-                message += "• Community Certificate — Required for OBC, SC, ST, MBC, and BC quota reservations.\n"
-                message += "• 10th & 12th Marksheets — For academic eligibility verification.\n"
-                message += "• College ID / Bonafide Certificate — Shows current degree course & CGPA.\n\n"
-
-            message += "⚠ Document requirements vary by scholarship. Always verify with the official scholarship portal.\n\n"
-            message += f"SOURCES & GROUNDING RULES:\n"
-            message += f"📖 National Scholarship Portal (NSP) — https://scholarships.gov.in\n"
-            message += f"📖 Data last verified: {today_str}\n"
-            message += "\n[Upload Documents →]"
-            return {
-                "answer": message,
-                "citations": [{"title": "National Scholarship Portal Guidelines", "url": "https://scholarships.gov.in"}],
-                "confidence": "HIGH"
-            }
-        else:
-            message = "✔ Verification guidelines checked\n\n"
-            message += "**General documents required for most scholarship applications:**\n\n"
-            message += "• Aadhaar Card — Must clearly show full name, DOB, gender, and state.\n"
-            message += "• Income Certificate — Issued by Revenue Department (Tahsildar) with annual income.\n"
-            message += "• Community Certificate — Required for OBC, SC, ST, MBC, and BC quota reservations.\n"
-            message += "• 10th & 12th Marksheets — For academic eligibility verification.\n"
-            message += "• College ID / Bonafide Certificate — Shows current degree course & CGPA.\n\n"
-            message += f"SOURCES & GROUNDING RULES:\n📖 National Scholarship Portal — https://scholarships.gov.in\n📖 Data last verified: {today_str}\n"
-            message += "\n[Upload Documents →]"
-            return {"answer": message, "citations": [], "confidence": "HIGH"}
+        message = "📄 **Required Documents**\n\n"
+        message += "**Common Documents:**\n"
+        message += "* Aadhaar Card\n"
+        message += "* Income Certificate (Revenue Dept/Tahsildar)\n"
+        message += "* College Bonafide / ID Card\n"
+        message += "* 10th & 12th Marksheets\n\n"
+        message += "**Additional Documents (Specific Schemes):**\n"
+        message += "* Community Certificate (for quota schemes)\n"
+        message += "* Bank Passbook / First Graduate Certificate\n\n"
+        message += "📌 **Note**\nRequirements vary slightly per scheme. Verify on the official scholarship portal.\n\n"
+        message += "[Upload Documents →]"
+        return {"answer": message, "citations": [], "confidence": "HIGH"}
 
     # ─── INTENT 6: Best scholarship / Which scholarship first ───────────────
     if any(p in q_lower for p in ["best scholarship", "which scholarship", "top scholarship", "recommend", "should i apply"]):
@@ -629,60 +618,30 @@ def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", e
             from .matching_agent import ScholarshipMatchingAgent
             matches = ScholarshipMatchingAgent(db).match_scholarships(user_id)
             eligible_matches = [m for m in matches if m["status"] == "Eligible"]
-
             if not eligible_matches:
                 eligible_matches = [m for m in matches if m["status"] == "Partially Eligible"]
 
-            message = "✔ Profile checked\n✔ All scholarship criteria evaluated\n✔ Multi-factor ranking applied\n\n"
-
             if eligible_matches:
-                # Rank by: match score (40%) + funding (30%) + deadline urgency (30%)
-                def rank_score(m):
-                    _, _, days_left = _get_deadline_urgency(m["deadline"])
-                    urgency = max(0, 100 - days_left) if days_left >= 0 else 0  # higher = more urgent
-                    num_amt = _get_numeric_amount(m.get("numeric_amount") or m.get("amount"))
-                    funding_norm = min(num_amt / 100000 * 100, 100)
-                    return 0.40 * m["match_percentage"] + 0.30 * funding_norm + 0.30 * urgency
-
-                eligible_matches = sorted(eligible_matches, key=rank_score, reverse=True)
                 top = eligible_matches[0]
-                s_obj = db.query(models.Scholarship).filter(models.Scholarship.id == top["id"]).first()
-                emoji, urgency_label, _ = _get_deadline_urgency(top["deadline"])
-                url = _get_official_url(top, s_obj)
+                dl = top.get("deadline") or "Not verified"
 
-                message += f"**🏆 Recommended: {top['scholarship_name']}**\n\n"
-                message += f"  🎯 Match Score: {top['match_percentage']}%\n"
-                message += f"  💰 Funding: {_format_amt(top['amount'])} per annum\n"
-                message += f"  {emoji} Deadline: {top['deadline']} ({urgency_label})\n\n"
-                message += "  **Why recommended:**\n"
+                message = f"🎯 **Result**\nYou appear eligible for **{len(eligible_matches)} scholarship{'s' if len(eligible_matches) != 1 else ''}**.\n\n"
+                message += f"🏆 **Top Match**\n**{top['scholarship_name']} — {top['match_percentage']}%**\n"
+                message += f"* Funding: {_format_amt(top['amount'])}\n"
+                message += f"* Deadline: {dl}\n"
+                message += f"* Reason: Strong match with your profile\n\n"
 
-                satisfied = [r for r in top["reasons"] if r.startswith("✔")]
-                for r in satisfied[:5]:
-                    message += f"  {r}\n"
-                message += "\n"
-
-                # Ranking rationale
-                message += "  **Ranking factors considered:**\n"
-                message += f"  • Profile match score (40% weight): {top['match_percentage']}%\n"
-                message += f"  • Funding value (30% weight): {_format_amt(top['amount'])}\n"
-                message += f"  • Deadline urgency (30% weight): {urgency_label}\n\n"
-
-                # Runners-up
                 if len(eligible_matches) > 1:
-                    message += "**Also eligible:**\n"
-                    for m in eligible_matches[1:3]:
-                        e2, ul2, _ = _get_deadline_urgency(m["deadline"])
-                        message += f"  • {m['scholarship_name']} — Match: {m['match_percentage']}%, Funding: {_format_amt(m['amount'])}, {e2} Deadline: {m['deadline']}\n"
+                    message += "⭐ **Other Matches**\n"
+                    for m in eligible_matches[1:4]:
+                        message += f"* {m['scholarship_name']} — {m['match_percentage']}%\n"
                     message += "\n"
 
-                message += f"SOURCES & GROUNDING RULES:\n📖 {top['scholarship_name']} — {url}\n📖 Ranking based on ScholarAI eligibility engine. Data verified: {today_str}\n"
-                message += "\n[View Eligible Scholarships →] [Upload Documents →]"
+                message += "📌 **Note**\nFinal eligibility must be confirmed by the scholarship authority.\n\n"
+                message += "[View Eligible Scholarships →] [Upload Documents →]"
             else:
-                message += "Based on your current profile, no fully eligible scholarships were found. Consider completing your profile and uploading required documents to unlock recommendations.\n\n"
-                message += f"SOURCES & GROUNDING RULES:\n📖 ScholarAI Scholarship Database — https://scholarships.gov.in\n"
-                message += "\n[Edit Profile →] [Upload Documents →]"
-
-            return {"answer": message, "citations": [{"title": m["scholarship_name"], "id": m["id"]} for m in eligible_matches[:3]], "confidence": "HIGH"}
+                message = "🎯 **Result**\nNo eligible scholarships matched yet.\n\n💡 **Recommendation**\nComplete your profile and upload documents to get personalized recommendations.\n\n[Edit Profile →]"
+            return {"answer": message, "citations": [], "confidence": "HIGH"}
 
     # ─── INTENT 7: What should I do next / next steps ───────────────────────
     if any(p in q_lower for p in ["what should i do", "next steps", "action", "what next", "apply now"]):
@@ -697,29 +656,21 @@ def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", e
             uploaded_types = [d.document_type for d in docs]
             missing_docs = [d for d in ["aadhaar", "income", "community", "college", "tenth", "twelfth"] if d not in uploaded_types]
 
-            message = "✔ Profile & eligibility checked\n\n"
-            message += "**🎯 Recommended Next Steps:**\n\n"
+            message = "**🎯 Recommended Next Steps**\n\n"
             step = 1
-
             if eligible_matches:
                 top = eligible_matches[0]
-                emoji, urgency, _ = _get_deadline_urgency(top["deadline"])
-                message += f"{step}. **Apply for {top['scholarship_name']}**\n"
-                message += f"   {emoji} Deadline: {top['deadline']} — {urgency}\n\n"
+                message += f"{step}. **Apply for {top['scholarship_name']}** (Deadline: {top['deadline']})\n"
                 step += 1
-
             if missing_docs:
-                message += f"{step}. **Upload missing documents** — {', '.join(d.title() for d in missing_docs)}\n\n"
+                message += f"{step}. **Upload Documents** — {', '.join(d.title() for d in missing_docs[:3])}\n"
                 step += 1
-
             if len(eligible_matches) > 1:
-                for m in eligible_matches[1:2]:
-                    message += f"{step}. Apply for **{m['scholarship_name']}** (Deadline: {m['deadline']})\n\n"
-                    step += 1
-
-            message += f"{step}. Visit the official scholarship portal to submit applications.\n\n"
-            message += f"SOURCES & GROUNDING RULES:\n📖 ScholarAI Eligibility Engine — Data verified: {today_str}\n"
-            message += "\n[View Eligible Scholarships →] [Upload Documents →] [Edit Profile →]"
+                message += f"{step}. **Apply for {eligible_matches[1]['scholarship_name']}**\n"
+                step += 1
+            message += f"{step}. Confirm application submission on the official portal.\n\n"
+            message += "**📌 Note**\nKeep all scanned certificates ready before starting your application.\n\n"
+            message += "[View Eligible Scholarships →] [Upload Documents →]"
             return {"answer": message, "citations": [], "confidence": "HIGH"}
 
     # ─── Fallback: Intent-Classified Routing ───────────────────────────────
@@ -731,110 +682,94 @@ def _generate_rag_response_en(user_query: str, user_profile_summary: str = "", e
         if live_results:
             live_context = "\n".join([f"• [{r['title']}]: {r['snippet']} (Source URL: {r['url']})" for r in live_results])
             current_prompt = f"""You are ScholarAI, an intelligent and grounded AI assistant for students.
-The user is asking a time-sensitive / current affairs / government official / live information question.
+Answer in a crisp, simple, and direct way:
+- Give the main answer first.
+- Keep response within 3-5 bullet points.
+- Cite official source URL.
 
-TODAY'S VERIFIED DATE: {today_str}
+TODAY'S DATE: {today_str}
 
-LIVE SEARCH CONTEXT (RETRIEVED LIVE FROM OFFICIAL WEBSITES & TRUSTED SOURCES):
+LIVE SEARCH CONTEXT:
 {live_context}
 
 USER QUESTION:
 {user_query}
 
-CRITICAL ANTI-HALLUCINATION & LIVE VERIFICATION RULES:
-1. For current office holders, government officials, district collectors, politicians, recruitment information, current deadlines, news, and other time-sensitive facts, NEVER rely solely on your pretrained knowledge.
-2. The current holder of the office MUST be taken directly from the verified Live Search Context provided above (which contains snippets from official government domains like .nic.in / .gov.in).
-3. Do NOT mention outdated previous officials as the current official.
-4. If the live search context specifies a current official (e.g. from a district portal or gazette), state their name, title, and assumption date accurately.
-5. If the live search context does NOT contain enough information to verify the current official, explicitly state that the current official could not be verified from available government records rather than guessing or giving an old answer.
-6. Conclude with a clear "SOURCES:" section citing the official government URL(s) and "Data verified: {today_str}".
-
 Answer:"""
             gemini_answer = call_gemini_api(current_prompt)
             if gemini_answer:
-                if "SOURCES" not in gemini_answer.upper():
-                    gemini_answer += f"\n\nSOURCES:\n"
-                    for r in live_results[:2]:
-                        gemini_answer += f"📖 {r['title']} — {r['url']}\n"
-                    gemini_answer += f"📖 Data verified: {today_str}\n"
                 return {
                     "answer": gemini_answer,
                     "citations": [{"title": r["title"], "url": r["url"]} for r in live_results],
-                    "context_used": [r["title"] for r in live_results],
                     "confidence": "HIGH"
                 }
 
-        # Fallback when live info cannot be verified or Gemini is unavailable
         return {
-            "answer": f"I can't verify the current information for \"{user_query}\" from official government records right now. My available information may be outdated.\n\nPlease check the official district administration website or government portal for live records.\n\n📖 Data verification attempted: {today_str}",
+            "answer": f"I cannot verify the live information for \"{user_query}\" right now. Please check official government portals for current records.\n\n📖 Verified: {today_str}",
             "citations": [],
-            "context_used": [],
             "confidence": "LOW"
         }
 
     # ── CASUAL INTENT → Gemini first, local fallback if unavailable ──
     if intent == "CASUAL":
         casual_prompt = f"""You are ScholarAI, a friendly and intelligent AI scholarship assistant for Indian students.
-The user is having a casual conversation. Respond warmly and naturally, then gently guide them toward scholarship-related features.
-Keep it brief (2-4 sentences max). Use emojis sparingly.
+Respond warmly, directly, and concisely (1-2 sentences). Guide them to ask about scholarships.
 
 User says: {user_query}
 
-Respond naturally:"""
+Respond:"""
         gemini_answer = call_gemini_api(casual_prompt)
         if gemini_answer:
-            return {"answer": gemini_answer, "citations": [], "context_used": [], "confidence": "HIGH"}
-        # Local fallback only if Gemini is down
+            return {"answer": gemini_answer, "citations": [], "confidence": "HIGH"}
         for key, resp in CASUAL_FALLBACK.items():
             if key in q_lower:
-                return {"answer": resp, "citations": [], "context_used": [], "confidence": "HIGH"}
-        return {"answer": "Hello! 👋 I'm ScholarAI — your AI scholarship advisor. Try asking about eligibility, deadlines, or documents!", "citations": [], "context_used": [], "confidence": "HIGH"}
+                return {"answer": resp, "citations": [], "confidence": "HIGH"}
+        return {"answer": "Hello! 👋 I'm ScholarAI — your AI scholarship advisor. Ask me about eligibility, deadlines, or documents!", "citations": [], "confidence": "HIGH"}
 
-    # ── GENERAL KNOWLEDGE or UNKNOWN → Gemini handles everything ──
+    # ── GENERAL KNOWLEDGE or UNKNOWN → Gemini handles everything with Crisp rules ──
     if intent in ("GENERAL_KNOWLEDGE", "UNKNOWN"):
-        gen_prompt = f"""You are ScholarAI, a helpful AI assistant for students. You can answer any general question.
-Answer clearly and concisely. If the topic relates to technology ScholarAI uses (Python, FastAPI, MySQL, React, Gemini, OCR), mention that briefly.
-Do NOT make up facts. If unsure, say so honestly.
+        gen_prompt = f"""You are ScholarAI. Answer this question in a crisp, direct, and simple way suitable for a student:
+- Main answer first in 1-2 clear sentences.
+- Use 3-5 bullet points with key concepts/examples.
+- Keep total response under 150 words.
+- Avoid repetition, filler, or internal logs.
 
-User asks: {user_query}
+Question: {user_query}
 
 Answer:"""
         gemini_answer = call_gemini_api(gen_prompt)
         if gemini_answer:
-            return {"answer": gemini_answer, "citations": [], "context_used": [], "confidence": "MEDIUM"}
-        # Gemini unavailable — honest message
+            return {"answer": gemini_answer, "citations": [], "confidence": "MEDIUM"}
         return {
-            "answer": ("I'm ScholarAI — your intelligent scholarship advisor! 🎓\n\n"
-                       "I'm having trouble connecting to my AI engine right now, but I can still help with scholarship queries using my local database:\n\n"
-                       "• ✔ \"Why am I eligible?\"\n"
-                       "• ✔ \"Compare scholarships\"\n"
-                       "• ✔ \"Deadline reminder\"\n"
-                       "• ✔ \"Required documents\"\n"
-                       "• ✔ \"Best scholarship for me\"\n"
-                       "• ✔ \"What should I do next?\"\n\n"
-                       "Try one of these scholarship-related questions!"),
-            "citations": [], "context_used": [], "confidence": "LOW"
+            "answer": ("I'm ScholarAI — your scholarship advisor! 🎓\n\n"
+                       "Try asking me one of these:\n"
+                       "• **Why am I eligible?**\n"
+                       "• **Best scholarship for me**\n"
+                       "• **Compare scholarships**\n"
+                       "• **Deadline reminder**\n"
+                       "• **Required documents**"),
+            "citations": [], "confidence": "LOW"
         }
 
-    # ── SCHOLARSHIP INTENT → Full RAG pipeline ──
+    # ── SCHOLARSHIP INTENT → Full RAG pipeline with Crisp Format ──
     context_docs = search_knowledge_base(user_query)
     citations = [{"title": d["title"], "id": d["id"]} for d in context_docs]
     context_str = "\n---\n".join([f"[{d['title']}]: {d['content'].strip()}" for d in context_docs])
 
-    rag_prompt = f"""You are ScholarAI, an expert Scholarship and Higher Education Advisor AI.
+    rag_prompt = f"""You are ScholarAI, an expert Scholarship Advisor AI.
+Answer the user's scholarship question strictly using the provided context.
 
-STRICT ACCURACY RULES:
-1. Ground your answer ONLY in the Knowledge Base, User Profile, and Scholarship System Data provided below.
-2. Never invent scholarship amounts, deadlines, eligibility limits, or government policies not present in the context.
-3. If any criterion cannot be verified, explicitly state: "Unable to verify this criterion from the available scholarship data."
-4. Do NOT claim a student is definitely eligible based only on CGPA and income — check ALL stated mandatory criteria.
-5. Always end with a SOURCES section citing official sources with real URLs (e.g., https://scholarships.gov.in).
-6. Format clearly using bullet points, tables, or short sections.
+CRISP RULES:
+1. Main answer first.
+2. 3-6 bullet points max.
+3. List: Scholarship Name, Match %, Funding, Deadline, Status.
+4. No filler, no internal logs, no repeated criteria.
+5. End with: "📌 Note: Final eligibility must be confirmed by the scholarship authority."
 
 [USER PROFILE]:
 {user_profile_summary}
 
-[SCHOLARSHIP DATABASE CONTEXT]:
+[SCHOLARSHIP CONTEXT]:
 {extra_context}
 
 [KNOWLEDGE BASE]:
@@ -843,27 +778,17 @@ STRICT ACCURACY RULES:
 [USER QUESTION]:
 {user_query}
 
-Respond accurately and helpfully:"""
+Answer:"""
 
     gemini_answer = call_gemini_api(rag_prompt)
     if gemini_answer:
         answer = gemini_answer
-        if "SOURCES" not in answer.upper():
-            answer += "\n\nSOURCES & GROUNDING RULES:\n"
-            for d in context_docs[:2]:
-                url = d.get("url") or "https://scholarships.gov.in"
-                answer += f"📖 {d['title']} — {url}\n"
-            answer += f"📖 Data last verified: {today_str}\n"
     else:
-        # Gemini unavailable — use local scholarship knowledge base
-        answer = f"According to ScholarAI knowledge records:\n\n{context_docs[0]['content'].strip()}\n\n"
-        url = context_docs[0].get("url") or "https://scholarships.gov.in"
-        answer += f"SOURCES & GROUNDING RULES:\n📖 {context_docs[0]['title']} — {url}\n📖 Data last verified: {today_str}\n"
+        answer = f"**🎯 Scholarship Information**\n\n{context_docs[0]['content'].strip()}\n\n**📌 Note**\nFinal eligibility must be confirmed by the scholarship authority."
 
     return {
         "answer": answer,
         "citations": citations,
-        "context_used": [d["title"] for d in context_docs],
         "confidence": "MEDIUM"
     }
 
