@@ -693,12 +693,15 @@ export const CertificateGeneratorPage = () => {
                 )}
               </div>
 
-              <button
-                onClick={handleDownload}
-                className="w-full mt-4 py-3 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition-all"
-              >
-                Generate & Download Certificate
-              </button>
+              <div className="flex flex-col gap-2.5 mt-5">
+                <button
+                  onClick={handleDownload}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-indigo-600 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <FileCheck className="w-4 h-4 text-white" />
+                  <span>Download Certificate Image (.png)</span>
+                </button>
+              </div>
 
               <div className="mt-4 p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 text-xs flex items-start gap-2">
                 <FileCheck className="w-4 h-4 shrink-0 mt-0.5" />

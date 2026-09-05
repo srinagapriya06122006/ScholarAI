@@ -9,7 +9,6 @@ const api = axios.create({
   timeout: 30000,
 });
 
-// Interceptor to automatically add JWT Token to authorization header if exists
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -19,6 +18,31 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle 401 Unauthorized errors automatically
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+      
+      // If unauthorized on a protected endpoint, clear stale auth data and redirect to login
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        delete api.defaults.headers.common['Authorization'];
+        
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
+    }
     return Promise.reject(error);
   }
 );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/Toast';
@@ -7,7 +7,7 @@ import { GlassCard } from '../components/GlassCard';
 import { AutopilotGuide } from '../components/AutopilotGuide';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
-import api from '../services/api';
+import { useSupervisorAutopilot } from '../hooks/useSupervisorAutopilot';
 import {
   GraduationCap,
   LogOut,
@@ -33,9 +33,15 @@ export const DashboardPage = () => {
   const { showToast } = useToast();
   const navigate = useNavigate();
 
-  const [stats, setStats] = useState({
+  // Integrated Autonomous Supervisor Autopilot Controller
+  const autopilot = useSupervisorAutopilot({
+    enableAutoNavigation: false,
+    stepDisplayDelayMs: 1200
+  });
+
+  const stats = autopilot.stats || {
     profile_completion: 0,
-    total_scholarships: 0,
+    total_scholarships: 54,
     eligible_count: 0,
     partially_eligible_count: 0,
     rejected_count: 0,
@@ -47,39 +53,7 @@ export const DashboardPage = () => {
       ai_matching: 'Pending'
     },
     mismatches: []
-  });
-
-  const [agentState, setAgentState] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchStats = React.useCallback(() => {
-    let isMounted = true;
-    Promise.all([
-      api.get('/dashboard/stats').catch(e => { console.error(e); return { data: null }; }),
-      api.get('/agent/state').catch(e => { console.error(e); return { data: null }; })
-    ]).then(([statsRes, agentRes]) => {
-      if (!isMounted) return;
-      if (statsRes.data) setStats(statsRes.data);
-      if (agentRes.data) setAgentState(agentRes.data);
-      setLoading(false);
-    });
-    return () => { isMounted = false; };
-  }, []);
-
-  useEffect(() => {
-    const cleanup = fetchStats();
-
-    // Re-fetch whenever the user returns to this tab/page
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchStats();
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      cleanup && cleanup();
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [fetchStats]);
+  };
 
   const handleLogout = () => {
     logout();
@@ -218,7 +192,10 @@ export const DashboardPage = () => {
         </div>
 
         {/* AI Agent Autopilot Guide Card */}
-        <AutopilotGuide agentState={agentState} />
+        <AutopilotGuide
+          autopilot={autopilot}
+          onManualSync={() => autopilot.syncState({ triggerRun: true })}
+        />
 
         {/* OCR Data Mismatch Warnings */}
         {stats.mismatches && stats.mismatches.length > 0 && (

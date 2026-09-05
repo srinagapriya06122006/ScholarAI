@@ -101,18 +101,19 @@ class SupervisorAgent:
         """
         Autonomous Planning:
         Constructs an ordered list of tasks based on the trigger event and current state.
+        Strict prerequisite order: Profile -> Documents -> OCR -> Verification -> Matching -> Recommendations.
         """
         event = context.event
         context.log("SUPERVISOR", f"Event received: {event} (User ID: {context.user_id})")
 
-        if event == "PROFILE_SUBMITTED":
-            plan = ["CHECK_PROFILE", "VERIFY_DOCUMENTS", "RUN_MATCHING", "CHECK_DOCUMENTS", "RUN_RECOMMENDATIONS"]
-        elif event == "DOCUMENT_UPLOADED":
-            plan = ["PROCESS_OCR", "VERIFY_DOCUMENTS", "CHECK_PROFILE", "RE_RUN_MATCHING", "CHECK_DOCUMENTS", "RUN_RECOMMENDATIONS"]
+        if event == "DOCUMENT_UPLOADED":
+            plan = ["PROCESS_OCR", "VERIFY_DOCUMENTS", "CHECK_PROFILE", "CHECK_DOCUMENTS", "RUN_MATCHING", "RUN_RECOMMENDATIONS"]
+        elif event == "PROFILE_SUBMITTED":
+            plan = ["PROCESS_OCR", "VERIFY_DOCUMENTS", "CHECK_PROFILE", "CHECK_DOCUMENTS", "RUN_MATCHING", "RUN_RECOMMENDATIONS"]
         elif event == "SCHOLARSHIP_SELECTED":
-            plan = ["CHECK_PROFILE", "VERIFY_DOCUMENTS", "RUN_MATCHING", "CHECK_DOCUMENTS", "RUN_RECOMMENDATIONS"]
+            plan = ["PROCESS_OCR", "VERIFY_DOCUMENTS", "CHECK_PROFILE", "CHECK_DOCUMENTS", "RUN_MATCHING", "RUN_RECOMMENDATIONS"]
         else: # Default evaluation / sync
-            plan = ["PROCESS_OCR", "VERIFY_DOCUMENTS", "CHECK_PROFILE", "RUN_MATCHING", "CHECK_DOCUMENTS", "RUN_RECOMMENDATIONS"]
+            plan = ["PROCESS_OCR", "VERIFY_DOCUMENTS", "CHECK_PROFILE", "CHECK_DOCUMENTS", "RUN_MATCHING", "RUN_RECOMMENDATIONS"]
 
         context.log("SUPERVISOR", f"Generated Execution Plan: {' -> '.join(plan)}")
         return plan
@@ -211,14 +212,15 @@ class SupervisorAgent:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _execute_ocr_processing(self, context: WorkflowContext):
-        """Processes any uploaded documents through Tesseract OCR."""
+        """Processes any uploaded documents through Tesseract OCR with smart caching."""
         if "PROCESS_OCR" in context.completed_steps:
             return
 
         documents = crud.get_user_documents(self.db, context.user_id)
         unprocessed = [
             d for d in documents 
-            if d.status in ("Uploaded", "UPLOADED", "OCR_PROCESSING", "Pending") or not d.extracted_data or d.status in ("OCR_FAILED", "OCR Failed")
+            if (d.status in ("Uploaded", "UPLOADED", "OCR_PROCESSING", "Pending") or not d.extracted_data)
+            and d.status not in ("VERIFIED", "Verified")
         ]
         
         if unprocessed:
@@ -252,6 +254,8 @@ class SupervisorAgent:
 
                 self.db.add(doc)
                 self.db.commit()
+        else:
+            context.log("SUPERVISOR", "All documents already have valid OCR extractions. Skipping duplicate processing.")
 
         # Ensure all extracted document data is synchronized into OCRData model
         ocr_model = crud.get_ocr_data(self.db, context.user_id)
@@ -376,13 +380,14 @@ class SupervisorAgent:
         context.completed_steps.append("RUN_MATCHING")
 
     def _execute_document_requirements_check(self, context: WorkflowContext):
-        """Audits required documents for the selected scholarship vs uploaded records."""
-        if not context.scholarship_id:
-            context.completed_steps.append("CHECK_DOCUMENTS")
-            return
+        """Audits required documents (baseline identity/income or specific scholarship docs) vs uploaded records."""
+        if context.scholarship_id:
+            context.log("SUPERVISOR", f"Auditing document requirements for scholarship ID {context.scholarship_id}.")
+            required_docs = self.doc_agent.get_required_documents(context.scholarship_id)
+        else:
+            context.log("SUPERVISOR", "Auditing baseline required documents (Aadhaar, Income Certificate, etc.).")
+            required_docs = ["aadhaar", "income"]
 
-        context.log("SUPERVISOR", f"Auditing document requirements for scholarship ID {context.scholarship_id}.")
-        required_docs = self.doc_agent.get_required_documents(context.scholarship_id)
         context.required_documents = required_docs
 
         documents = crud.get_user_documents(self.db, context.user_id)
@@ -394,7 +399,7 @@ class SupervisorAgent:
         uploaded_list = []
 
         for rdoc in required_docs:
-            if rdoc not in doc_map or doc_map[rdoc].status in ("Pending", "Uploaded", "UPLOADED"):
+            if rdoc not in doc_map or doc_map[rdoc].status in ("Pending", "Not Uploaded", "NOT_UPLOADED"):
                 missing_docs.append(rdoc)
             else:
                 uploaded_list.append(rdoc)
@@ -412,7 +417,7 @@ class SupervisorAgent:
             context.current_stage = "DOCUMENTS_MISSING"
             context.next_action = "WAIT_FOR_DOCUMENT"
             context.decision_reason = f"Missing required documents: {', '.join(missing_docs)}"
-            context.log("SUPERVISOR", f"Decision: Documents missing ({missing_docs}). Waiting for student upload.")
+            context.log("SUPERVISOR", f"Decision: Documents missing ({missing_docs}). Halting workflow for student upload.")
         elif mismatch_docs or ocr_failed_docs:
             reasons = []
             for doc_type in mismatch_docs + ocr_failed_docs:
@@ -420,7 +425,7 @@ class SupervisorAgent:
                 if d.extracted_data:
                     try:
                         data = json.loads(d.extracted_data)
-                        if d.status == "OCR_FAILED":
+                        if d.status in ("OCR_FAILED", "OCR Failed"):
                             reasons.append(f"{doc_type.capitalize()}: {data.get('error_message')}")
                         else:
                             reasons.extend(data.get('reasons', []))
@@ -431,8 +436,11 @@ class SupervisorAgent:
             context.decision_reason = f"Verification Mismatch: {', '.join(reasons)}"
             context.log("SUPERVISOR", f"Decision: Document discrepancies found. Halting for correction.")
         else:
-            context.current_stage = "APPLICATION_READY"
-            context.log("SUPERVISOR", "Decision: All required documents verified. Application is ready for generation.")
+            if context.scholarship_id:
+                context.current_stage = "APPLICATION_READY"
+                context.log("SUPERVISOR", "Decision: All required documents verified. Application is ready for generation.")
+            else:
+                context.log("SUPERVISOR", "Decision: All baseline documents uploaded & verified.")
 
         context.completed_steps.append("CHECK_DOCUMENTS")
 
@@ -567,18 +575,29 @@ class SupervisorAgent:
                     pass
 
         # Action keyword mapping expected by UI
-        action_map = {
-            "PROFILE_INCOMPLETE": "NEED_PROFILE",
-            "DOCUMENTS_MISSING": "NEED_DOCUMENTS",
-            "CORRECTION_REQUIRED": "NEED_CORRECTION",
-            "APPLICATION_READY": "APPLICATION_READY",
-            "MATCHING_COMPLETED": "NEED_SCHOLARSHIP_SELECT" if not context.scholarship_id else "IN_PROGRESS",
-            "MATCHING": "NEED_SCHOLARSHIP_SELECT",
-            "COMPLETED": "COMPLETED"
-        }
-        action = action_map.get(context.current_stage, "IN_PROGRESS")
-        if context.matching_results and not context.scholarship_id:
+        if context.current_stage == "PROFILE_INCOMPLETE" or context.profile_complete is False:
+            action = "NEED_PROFILE"
+        elif context.current_stage == "DOCUMENTS_MISSING" or context.missing_documents:
+            action = "NEED_DOCUMENTS"
+        elif context.current_stage == "CORRECTION_REQUIRED" or mismatches or context.mismatch_documents:
+            action = "NEED_CORRECTION"
+        elif context.current_stage == "APPLICATION_READY":
+            action = "APPLICATION_READY"
+        elif context.current_stage == "SUBMITTED" or context.current_stage == "COMPLETED":
+            action = "COMPLETED"
+        elif context.matching_results and not context.scholarship_id:
             action = "NEED_SCHOLARSHIP_SELECT"
+        else:
+            action_map = {
+                "PROFILE_INCOMPLETE": "NEED_PROFILE",
+                "DOCUMENTS_MISSING": "NEED_DOCUMENTS",
+                "CORRECTION_REQUIRED": "NEED_CORRECTION",
+                "APPLICATION_READY": "APPLICATION_READY",
+                "MATCHING_COMPLETED": "NEED_SCHOLARSHIP_SELECT" if not context.scholarship_id else "IN_PROGRESS",
+                "MATCHING": "NEED_SCHOLARSHIP_SELECT",
+                "COMPLETED": "COMPLETED"
+            }
+            action = action_map.get(context.current_stage, "IN_PROGRESS")
 
         req_list = context.required_documents or (state.required_documents.split(",") if state.required_documents else [])
 

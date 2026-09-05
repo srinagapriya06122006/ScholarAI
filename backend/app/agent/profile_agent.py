@@ -20,13 +20,11 @@ class ProfileAgent:
                 "errors": ["User record not found."]
             }
 
-        # Check required fields
+        # Check core required fields
         checks = {
             "Name": user.fullName,
-            "Age": profile.age,
             "Gender": profile.gender,
             "Category": profile.category,
-            "Religion": profile.religion,
             "Income": profile.annualIncome,
             "Degree": profile.degree,
             "Department": profile.department,
@@ -34,12 +32,7 @@ class ProfileAgent:
             "Current Year": profile.year,
             "CGPA": profile.cgpa,
             "10th %": profile.tenthPercentage,
-            "12th %": profile.twelfthPercentage,
-            "Disability": profile.disability,
-            "Sports": profile.sportsQuota,
-            "NCC": profile.ncc,
-            "NSS": profile.nss,
-            "First Graduate": profile.firstGraduate
+            "12th %": profile.twelfthPercentage
         }
 
         missing_fields = []

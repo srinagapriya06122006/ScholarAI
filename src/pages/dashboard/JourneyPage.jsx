@@ -34,9 +34,11 @@ export const JourneyPage = () => {
   const [applications, setApplications] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch current agent state
+  // Fetch current agent state and passively evaluate via Supervisor
   const fetchData = async () => {
     try {
+      // Passive run through Supervisor to ensure latest stage is evaluated
+      const runRes = await api.post('/agent/run');
       const stateRes = await api.get('/agent/state');
       setState(stateRes.data);
 
@@ -68,21 +70,6 @@ export const JourneyPage = () => {
     fetchData().finally(() => setLoading(false));
   }, []);
 
-  const handleStartOrRun = () => {
-    setRunning(true);
-    const param = selectedSchId ? `?scholarship_id=${selectedSchId}` : '';
-    api.post(`/agent/journey/start${param}`)
-      .then((res) => {
-        showToast(res.data.message || 'AI Pipeline executed successfully.', 'success');
-        fetchData();
-      })
-      .catch((err) => {
-        showToast('Error running supervisor agent.', 'error');
-        console.error(err);
-      })
-      .finally(() => setRunning(false));
-  };
-
   const handleReset = () => {
     if (!window.confirm("Are you sure you want to reset the AI Scholarship Journey and clear all logs?")) return;
     setRunning(true);
@@ -111,8 +98,11 @@ export const JourneyPage = () => {
       .then((res) => {
         setSubmitting(false);
         if (res.data.success) {
-          showToast('🎉 Application submitted successfully!', 'success');
+          showToast('🎉 Application submitted successfully! Transitioning to Application Tracking...', 'success');
           fetchData();
+          setTimeout(() => {
+            navigate('/dashboard/applications');
+          }, 1200);
         } else {
           showToast(`Application submission failed: ${res.data.message}`, 'error');
         }
@@ -289,12 +279,15 @@ export const JourneyPage = () => {
             )}
 
             <button
-              onClick={handleStartOrRun}
+              onClick={() => {
+                setRunning(true);
+                fetchData().finally(() => setRunning(false));
+              }}
               disabled={running}
               className="flex items-center gap-2 py-2.5 px-4 text-xs font-extrabold bg-gradient-to-r from-sky-500 to-indigo-600 text-white rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 transition-all cursor-pointer"
             >
               {running ? <Loader className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              {state?.current_stage === 'NOT_STARTED' ? 'Start AI Journey' : 'Sync/Run Next Agent'}
+              {running ? 'Supervisor Running...' : 'Auto-Sync Workflow'}
             </button>
 
             {state?.current_stage !== 'SUBMITTED' && (

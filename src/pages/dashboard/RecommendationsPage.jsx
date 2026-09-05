@@ -45,6 +45,7 @@ export const RecommendationsPage = () => {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'eligible', 'rejected'
+  const [submittedSchIds, setSubmittedSchIds] = useState(new Set());
 
   const handleVerifyGoogle = (sch) => {
     if (!sch) return;
@@ -108,6 +109,18 @@ export const RecommendationsPage = () => {
     return '₹20,000';
   };
 
+  const getNumericAmount = (sch) => {
+    if (!sch) return 0;
+    if (sch.numeric_amount && sch.numeric_amount >= 500) return sch.numeric_amount;
+    const raw = String(sch.amount || '').replace(/,/g, '');
+    const match = raw.match(/(\d{4,9})/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num >= 500) return num;
+    }
+    return 0;
+  };
+
   const formatAmount = (amt) => {
     if (!amt && amt !== 0) return 'Varies';
     if (typeof amt === 'number') return `Rs. ${amt.toLocaleString()}`;
@@ -118,9 +131,29 @@ export const RecommendationsPage = () => {
     return s;
   };
 
+  const fetchApplications = () => {
+    api.get('/applications')
+      .then((res) => {
+        const submittedSet = new Set();
+        (res.data || []).forEach(app => {
+          const status = (app.status || '').toUpperCase();
+          if (['SUBMITTED', 'APPLIED', 'WAITING', 'APPROVED', 'UNDER REVIEW', 'UNDER_REVIEW'].includes(status)) {
+            if (app.scholarship_id) submittedSet.add(Number(app.scholarship_id));
+            if (app.scholarship?.id) submittedSet.add(Number(app.scholarship.id));
+            if (app.scholarship?.s_no) submittedSet.add(Number(app.scholarship.s_no));
+          }
+        });
+        setSubmittedSchIds(submittedSet);
+      })
+      .catch((err) => {
+        console.error('Failed to load applications:', err);
+      });
+  };
+
   const fetchScholarships = () => {
     setLoading(true);
     setError(null);
+    fetchApplications();
     api.get('/scholarships')
       .then((res) => {
         const cleaned = (res.data || []).map(s => ({
@@ -150,6 +183,7 @@ export const RecommendationsPage = () => {
 
   useEffect(() => {
     fetchScholarships();
+    fetchApplications();
 
     // Fetch user profile for comparison values
     api.get('/profile')
@@ -389,11 +423,14 @@ export const RecommendationsPage = () => {
   const eligibleMatches = filteredScholarships.filter(s => s.eligible);
   const notEligibleMatches = filteredScholarships.filter(s => !s.eligible);
 
-  const bestScholarship = eligibleScholarships.reduce((best, current) => {
-    if (!best) return current;
-    if (current.match_percentage > best.match_percentage) return current;
-    return best;
-  }, null);
+  // Rank eligible scholarships: primarily by match percentage, secondarily by scholarship amount
+  const rankedScholarships = [...eligibleScholarships].sort((a, b) => {
+    const matchDiff = (b.match_percentage || 0) - (a.match_percentage || 0);
+    if (matchDiff !== 0) return matchDiff;
+    return getNumericAmount(b) - getNumericAmount(a);
+  });
+
+  const bestScholarship = rankedScholarships[0] || null;
 
   // Profile Strength & Dynamic Suggestions
   const profileSuggestions = [];
@@ -526,8 +563,14 @@ export const RecommendationsPage = () => {
                       <span className="font-bold text-slate-900 dark:text-white">{totalAnalyzed}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Eligible</span>
+                      <span>Eligible Matches</span>
                       <span className="font-bold text-emerald-500">{eligibleScholarships.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Already Submitted</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                        {eligibleScholarships.filter(s => submittedSchIds.has(Number(s.id))).length}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Not Eligible</span>
@@ -538,9 +581,12 @@ export const RecommendationsPage = () => {
 
                 {bestScholarship && (
                   <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block mb-1">Best Recommendation</span>
-                    <span className="text-xs font-bold text-sky-600 dark:text-sky-400 block">{bestScholarship.scholarship_name}</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">Reason: Highest match score & benefits</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block mb-1">Top Recommendation (Highest Value)</span>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-xs font-bold text-sky-600 dark:text-sky-400 block truncate">{bestScholarship.scholarship_name}</span>
+                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{getCardAmount(bestScholarship)}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">Reason: 100% eligibility match with maximum scholarship grant</span>
                   </div>
                 )}
               </div>
@@ -602,34 +648,61 @@ export const RecommendationsPage = () => {
 
             {/* Widget 4: AI Scholarship Comparison & Rankings */}
             <div className="bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-800/80 rounded-2xl shadow-xl p-6">
-              <h3 className="text-sm font-black text-slate-900 dark:text-slate-200 mb-4 uppercase tracking-wider flex items-center gap-2">
-                <ListOrdered className="w-4.5 h-4.5 text-sky-500" /> AI Recommendation Ranking
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-4">
+                <h3 className="text-sm font-black text-slate-900 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                  <ListOrdered className="w-4.5 h-4.5 text-sky-500" /> AI Recommendation Ranking (Top 3 by Grant Amount & Match)
+                </h3>
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  Ranked #1, #2, #3 based on maximum financial grant & 100% profile criteria
+                </span>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {eligibleScholarships.slice(0, 3).map((sch, index) => (
-                  <div
-                    key={sch.id}
-                    className="p-5 rounded-xl bg-slate-50 dark:bg-[#111a2e] border border-slate-200/80 dark:border-slate-800/80 relative overflow-hidden flex flex-col justify-between shadow-sm hover:border-sky-500/40 transition-all"
-                  >
-                    <div>
-                      <div className="absolute top-3 right-4 font-black text-slate-300/80 dark:text-slate-800/60 text-4xl select-none">
-                        #{index + 1}
+                {rankedScholarships.slice(0, 3).map((sch, index) => {
+                  const isSubmitted = submittedSchIds.has(Number(sch.id));
+                  return (
+                    <div
+                      key={sch.id}
+                      className={`p-5 rounded-xl bg-slate-50 dark:bg-[#111a2e] border ${
+                        isSubmitted
+                          ? 'border-emerald-500/50 dark:border-emerald-500/40 bg-emerald-500/[0.03]'
+                          : 'border-slate-200/80 dark:border-slate-800/80 hover:border-sky-500/40'
+                      } relative overflow-hidden flex flex-col justify-between shadow-sm transition-all`}
+                    >
+                      <div>
+                        <div className="absolute top-3 right-4 font-black text-slate-300/80 dark:text-slate-800/60 text-4xl select-none">
+                          #{index + 1}
+                        </div>
+                        <div className="flex items-center gap-1.5 mb-2 pr-12 flex-wrap">
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 inline-block">
+                            {sch.match_percentage}% Match
+                          </span>
+                          {isSubmitted && (
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-0.5">
+                              <Check className="w-2.5 h-2.5" /> Submitted
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Prominent Amount Display */}
+                        <div className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight flex items-baseline gap-1.5">
+                          <span>{getCardAmount(sch)}</span>
+                          <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-1.5 py-0.5 rounded">Grant Value</span>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1.5 line-clamp-2 leading-snug">
+                          {sch.scholarship_name}
+                        </h4>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
+                          {sch.description}
+                        </p>
                       </div>
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 mb-2 inline-block">
-                        {sch.match_percentage}% Match
-                      </span>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2 truncate">
-                        {sch.scholarship_name}
-                      </h4>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-                        {sch.description}
-                      </p>
+                      <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 border-t border-slate-200 dark:border-slate-800/80 pt-2.5 mt-2 flex items-center justify-between">
+                        <span>Rank #{index + 1} • <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{getCardAmount(sch)}</strong></span>
+                        <span className="text-[10px] text-sky-600 dark:text-sky-400 font-bold">Highest Benefit</span>
+                      </div>
                     </div>
-                    <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 border-t border-slate-200 dark:border-slate-800/80 pt-2.5 mt-2">
-                      Highlights: High academic compatibility & eligibility match.
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -700,64 +773,87 @@ export const RecommendationsPage = () => {
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">These scholarships perfectly match your profile parameters.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {eligibleMatches.map((sch) => (
-                      <div
-                        key={sch.id}
-                        className="bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-xl relative flex flex-col justify-between hover:border-sky-500/50 transition-all group"
-                      >
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-                              <Award className="w-5 h-5" />
-                            </div>
-                            <div className="text-right">
-                              <span className="inline-block text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
-                                {sch.match_percentage}% Match
-                              </span>
-                              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">
-                                {getCardAmount(sch)}
+                    {eligibleMatches.map((sch) => {
+                      const isSubmitted = submittedSchIds.has(Number(sch.id));
+                      return (
+                        <div
+                          key={sch.id}
+                          className={`bg-white dark:bg-[#0c1322] border ${
+                            isSubmitted
+                              ? 'border-emerald-500/50 dark:border-emerald-500/40 shadow-emerald-500/5 bg-emerald-500/[0.015]'
+                              : 'border-slate-200 dark:border-slate-800/80 hover:border-sky-500/50'
+                          } rounded-2xl p-6 shadow-xl relative flex flex-col justify-between transition-all group`}
+                        >
+                          <div>
+                            <div className="flex justify-between items-start mb-4">
+                              <div className={`w-10 h-10 rounded-xl ${isSubmitted ? 'bg-emerald-600' : 'bg-blue-500'} flex items-center justify-center text-white shadow-md`}>
+                                <Award className="w-5 h-5" />
+                              </div>
+                              <div className="text-right flex flex-col items-end gap-1">
+                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                  {isSubmitted && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 shadow-sm">
+                                      <Check className="w-3 h-3" /> Already Submitted
+                                    </span>
+                                  )}
+                                  <span className="inline-block text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                                    {sch.match_percentage}% Match
+                                  </span>
+                                </div>
+                                <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">
+                                  {getCardAmount(sch)}
+                                </div>
                               </div>
                             </div>
+
+                            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2 leading-snug line-clamp-2">
+                              {sch.scholarship_name}
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+                              {sch.description}
+                            </p>
+                            <div className="flex items-center gap-1.5 text-xs text-sky-600 dark:text-sky-400 mb-6 font-mono font-medium">
+                              <Calendar className="w-4 h-4 text-sky-500" /> Deadline: {sch.deadline || '2026-10-31'}
+                            </div>
                           </div>
 
-                          <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2 leading-snug line-clamp-2">
-                            {sch.scholarship_name}
-                          </h3>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2 leading-relaxed">
-                            {sch.description}
-                          </p>
-                          <div className="flex items-center gap-1.5 text-xs text-sky-600 dark:text-sky-400 mb-6 font-mono font-medium">
-                            <Calendar className="w-4 h-4 text-sky-500" /> Deadline: {sch.deadline || '2026-10-31'}
+                          <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                            <button
+                              onClick={() => {
+                                console.log("Why Recommended clicked for:", sch);
+                                setActiveReasoning(sch);
+                              }}
+                              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#1e293b]/70 dark:hover:bg-[#334155]/80 text-slate-700 dark:text-slate-300 font-bold text-xs border border-slate-200 dark:border-slate-700/40 transition-all cursor-pointer"
+                            >
+                              <Info className="w-4 h-4 text-sky-400" /> <span>Why Recommended?</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleVerifyGoogle(sch)}
+                              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-300 font-bold text-xs border border-cyan-500/30 transition-all cursor-pointer shadow-sm shadow-cyan-500/10"
+                            >
+                              <Globe className="w-4 h-4 text-cyan-400" /> <span>Open on Google</span>
+                            </button>
+
+                            {isSubmitted ? (
+                              <button
+                                onClick={() => navigate('/dashboard/applications')}
+                                className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+                              >
+                                <Check className="w-4 h-4" /> Already Submitted • Track Status →
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleApplyClick(sch)}
+                                className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 hover:opacity-95 text-white shadow-lg shadow-sky-500/25 transition-all cursor-pointer text-center"
+                              >
+                                Select Scholarship
+                              </button>
+                            )}
                           </div>
                         </div>
-
-                        <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-800/60">
-                          <button
-                            onClick={() => {
-                              console.log("Why Recommended clicked for:", sch);
-                              setActiveReasoning(sch);
-                            }}
-                            className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#1e293b]/70 dark:hover:bg-[#334155]/80 text-slate-700 dark:text-slate-300 font-bold text-xs border border-slate-200 dark:border-slate-700/40 transition-all cursor-pointer"
-                          >
-                            <Info className="w-4 h-4 text-sky-400" /> <span>Why Recommended?</span>
-                          </button>
-
-                          <button
-                            onClick={() => handleVerifyGoogle(sch)}
-                            className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-300 font-bold text-xs border border-cyan-500/30 transition-all cursor-pointer shadow-sm shadow-cyan-500/10"
-                          >
-                            <Globe className="w-4 h-4 text-cyan-400" /> <span>Verify on Google</span>
-                          </button>
-
-                          <button
-                            onClick={() => handleApplyClick(sch)}
-                            className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 hover:opacity-95 text-white shadow-lg shadow-sky-500/25 transition-all cursor-pointer text-center"
-                          >
-                            Select Scholarship
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -818,7 +914,7 @@ export const RecommendationsPage = () => {
                             onClick={() => handleVerifyGoogle(sch)}
                             className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 font-bold text-xs border border-cyan-500/30 transition-all cursor-pointer"
                           >
-                            <Globe className="w-4 h-4 text-cyan-400" /> <span>Verify on Google</span>
+                            <Globe className="w-4 h-4 text-cyan-400" /> <span>Open on Google</span>
                           </button>
 
                           <button
@@ -1144,6 +1240,7 @@ export const RecommendationsPage = () => {
                           .then((res) => {
                             if (res.data?.success) {
                               showToast('🎉 Application confirmed and submitted!', 'success');
+                              setSubmittedSchIds(prev => new Set([...prev, Number(applyingScholarship.id)]));
                               setApplyingScholarship(null);
                               setWizardStep('details');
                               navigate('/dashboard/journey');
@@ -1155,6 +1252,7 @@ export const RecommendationsPage = () => {
                             const detail = err.response?.data?.detail;
                             if (detail?.code === 'ALREADY_SUBMITTED') {
                               showToast('You have already submitted this scholarship.', 'info');
+                              setSubmittedSchIds(prev => new Set([...prev, Number(applyingScholarship.id)]));
                               setApplyingScholarship(null);
                               navigate('/dashboard/journey');
                             } else {
@@ -1190,6 +1288,7 @@ export const RecommendationsPage = () => {
         <AdaptiveRpaVerificationModal
           scholarship={verifyingSch}
           studentProfile={userProfile}
+          isSubmitted={submittedSchIds.has(Number(verifyingSch.id))}
           onClose={() => setVerifyingSch(null)}
           onSelect={handleApplyClick}
         />

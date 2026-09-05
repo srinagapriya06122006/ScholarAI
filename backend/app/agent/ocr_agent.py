@@ -113,21 +113,26 @@ class TesseractOCREngine(BaseOCREngine):
 
     def _extract_pdf(self, file_path: str, expected_type: str) -> str:
         text = ""
+        # 1. Try PyPDF / pypdf
         try:
-            import pypdf
-            reader = pypdf.PdfReader(file_path)
-            for page in reader.pages:
-                text += page.extract_text() or ""
-        except Exception as e:
-            print(f"[PDF EXTRACTION WARNING] pypdf failed: {e}")
+            import importlib
+            pypdf_module = None
             try:
-                from PIL import Image
-                img = Image.open(file_path)
-                return self._run_tesseract_multi_psm(img, expected_type)
+                pypdf_module = importlib.import_module("pypdf")
             except Exception:
-                pass
+                try:
+                    pypdf_module = importlib.import_module("PyPDF2")
+                except Exception:
+                    pass
 
-        # If digital text extraction yields nothing, fall back to PIL / pdf2image + OCR
+            if pypdf_module and hasattr(pypdf_module, "PdfReader"):
+                reader = pypdf_module.PdfReader(file_path)
+                for page in reader.pages:
+                    text += page.extract_text() or ""
+        except Exception as e:
+            print(f"[PDF EXTRACTION WARNING] PDF text extraction failed: {e}")
+
+        # 2. Try PIL Image directly if it's an image-format container
         if not text.strip() or len(text.strip()) < 10:
             try:
                 from PIL import Image
@@ -138,14 +143,17 @@ class TesseractOCREngine(BaseOCREngine):
             except Exception:
                 pass
 
+            # 3. Try pdf2image dynamically if installed
             try:
-                import pdf2image
-                # Convert first page of the PDF to image
-                pages = pdf2image.convert_from_path(file_path, first_page=1, last_page=1)
-                if pages:
-                    text = self._run_tesseract_multi_psm(pages[0], expected_type)
+                import importlib
+                pdf2img_module = importlib.import_module("pdf2image")
+                if hasattr(pdf2img_module, "convert_from_path"):
+                    pages = pdf2img_module.convert_from_path(file_path, first_page=1, last_page=1)
+                    if pages:
+                        text = self._run_tesseract_multi_psm(pages[0], expected_type)
             except Exception as e:
                 print(f"[PDF EXTRACTION WARNING] pdf2image fallback failed: {e}")
+
         return text
 
     def extract_text(self, file_path: str, expected_type: str) -> dict:

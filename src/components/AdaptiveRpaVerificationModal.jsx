@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 
-export default function AdaptiveRpaVerificationModal({ scholarship, studentProfile, onClose, onSelect }) {
+export default function AdaptiveRpaVerificationModal({ scholarship, studentProfile, isSubmitted, onClose, onSelect }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -427,15 +427,27 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
         {/* Modal Bottom Footer Actions */}
         <div className="pt-4 border-t border-slate-800/80 flex items-center justify-end gap-3">
           {!loading && !failed && isRecommended && onSelect && (
-            <button
-              onClick={() => {
-                onClose();
-                onSelect(scholarship);
-              }}
-              className="py-2.5 px-5 rounded-xl font-bold text-xs bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 hover:opacity-95 text-white shadow-lg shadow-sky-500/25 transition-all cursor-pointer"
-            >
-              Select Scholarship
-            </button>
+            isSubmitted ? (
+              <button
+                onClick={() => {
+                  onClose();
+                  window.location.href = '/dashboard/applications';
+                }}
+                className="py-2.5 px-5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" /> Already Submitted • Track
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  onClose();
+                  onSelect(scholarship);
+                }}
+                className="py-2.5 px-5 rounded-xl font-bold text-xs bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 hover:opacity-95 text-white shadow-lg shadow-sky-500/25 transition-all cursor-pointer"
+              >
+                Select Scholarship
+              </button>
+            )
           )}
 
           <button

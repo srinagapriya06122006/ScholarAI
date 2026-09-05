@@ -172,10 +172,15 @@ export const ProfilePage = () => {
     api.put('/profile', payload)
       .then((res) => {
         setCompletionScore(res.data.completionScore);
-        showToast('Profile saved successfully!', 'success');
-        setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 800);
+        showToast('Profile saved successfully! Resuming AI Autopilot workflow...', 'success');
+        
+        // Trigger Supervisor pipeline update and return to Dashboard Control Center
+        api.post('/agent/run')
+          .finally(() => {
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 600);
+          });
       })
       .catch((err) => {
         showToast('Failed to save profile details.', 'error');
