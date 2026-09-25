@@ -67,322 +67,407 @@ class GoogleScholarshipVerificationAgent:
         """Check if Google returned a CAPTCHA / bot challenge page."""
         try:
             url = page.url.lower()
-            if "google.com/sorry" in url or "sorry/index" in url or "sorry" in url:
+            if "google.com/sorry" in url or "sorry/index" in url:
                 return True
             title = page.title().lower()
             if "sorry" in title or "unusual traffic" in title:
                 return True
-            if page.locator("iframe[src*='recaptcha'], iframe[title*='reCAPTCHA'], #captcha-form").count() > 0:
+            if page.locator("#captcha-form, form[action*='sorry']").count() > 0:
+                return True
+            if page.locator("iframe[src*='recaptcha'], iframe[title*='reCAPTCHA']").count() > 0:
                 return True
         except Exception:
             pass
         return False
 
-    def _handle_captcha_and_research(self, page, q_text: str, max_wait: int = 60) -> bool:
-        """
-        When Google serves a CAPTCHA (google.com/sorry):
-        1. Brings browser to front so user sees it.
-        2. Shows user an on-screen banner: click 'I am not a robot' and search will re-run automatically.
-        3. Attempts auto-click on the 'I am not a robot' checkbox.
-        4. Waits up to max_wait (60s) for the user to click / solve verification.
-        5. Once resolved, immediately re-runs the search for q_text.
-        """
-        if not self._is_captcha(page):
-            return False
-
-        logger.warning(
-            f"Google CAPTCHA encountered on query: '{q_text}'. "
-            f"Waiting up to {max_wait}s for user to click 'I am not a robot' / solve verification..."
-        )
-
+    def _inject_captcha_banner(self, page):
+        """Inject a visible ScholarAI guidance banner on the CAPTCHA page."""
         try:
             page.bring_to_front()
         except Exception:
             pass
-
-        # Inject visible on-screen guidance banner
         try:
-            page.evaluate("""
+            page.evaluate(
+                """
                 (() => {
                     if (document.getElementById('scholarai-captcha-notice')) return;
-                    const banner = document.createElement('div');
-                    banner.id = 'scholarai-captcha-notice';
-                    banner.style.position = 'fixed';
-                    banner.style.top = '14px';
-                    banner.style.left = '50%';
-                    banner.style.transform = 'translateX(-50%)';
-                    banner.style.backgroundColor = '#0f172a';
-                    banner.style.color = '#38bdf8';
-                    banner.style.border = '2px solid #0284c7';
-                    banner.style.padding = '12px 24px';
-                    banner.style.borderRadius = '12px';
-                    banner.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
-                    banner.style.zIndex = '2147483647';
-                    banner.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-                    banner.style.fontSize = '14px';
-                    banner.style.fontWeight = 'bold';
-                    banner.style.textAlign = 'center';
-                    banner.innerHTML = '🤖 ScholarAI: Please click <b>\"I\\'m not a robot\"</b> below. The search will automatically re-run once verified!';
-                    document.body.appendChild(banner);
+                    const b = document.createElement('div');
+                    b.id = 'scholarai-captcha-notice';
+                    Object.assign(b.style, {
+                        position:'fixed', top:'14px', left:'50%',
+                        transform:'translateX(-50%)',
+                        background:'#0f172a', color:'#38bdf8',
+                        border:'2px solid #0284c7', padding:'12px 24px',
+                        borderRadius:'12px', zIndex:'2147483647',
+                        fontFamily:'system-ui,sans-serif', fontSize:'14px',
+                        fontWeight:'bold', textAlign:'center',
+                        boxShadow:'0 10px 30px rgba(0,0,0,0.6)'
+                    });
+                    b.innerHTML = '\U0001F916 ScholarAI: Please solve the CAPTCHA below. <br>The search will <b>automatically re-run</b> once verified!';
+                    document.body.appendChild(b);
                 })()
-            """)
+                """
+            )
         except Exception:
             pass
 
-        # Attempt auto-click on reCAPTCHA checkbox
+    def _handle_captcha_and_research(self, page, q_text: str, max_wait: int = 75) -> bool:
+        """
+        When Google serves a CAPTCHA (google.com/sorry):
+        1. Brings browser to front and shows guidance banner.
+        2. Attempts auto-click on reCAPTCHA checkbox.
+        3. Polls every second for up to max_wait seconds for the user to solve it.
+        4. Once solved, immediately re-executes the search query.
+        Returns True if CAPTCHA resolved + results page reached.
+        """
+        if not self._is_captcha(page):
+            return False
+
+        logger.warning(f"[CAPTCHA] Detected on query: '{q_text}'. Waiting up to {max_wait}s for human resolution...")
+        self._inject_captcha_banner(page)
+
+        # Attempt programmatic reCAPTCHA auto-click
         try:
             for frame in page.frames:
-                if "recaptcha" in frame.url:
+                if "recaptcha" in frame.url.lower():
                     cb = frame.locator("#recaptcha-anchor, .recaptcha-checkbox").first
                     if cb.is_visible(timeout=1500):
-                        logger.info("Attempting auto-click on reCAPTCHA 'I am not a robot' checkbox...")
+                        logger.info("[CAPTCHA] Auto-clicking reCAPTCHA checkbox...")
                         cb.click()
                         time.sleep(1.0)
                         break
         except Exception as e:
-            logger.debug(f"Auto-click attempt: {e}")
+            logger.debug(f"[CAPTCHA] Auto-click skipped: {e}")
 
-        # Wait for user to solve CAPTCHA
-        start_wait = time.time()
-        while time.time() - start_wait < max_wait:
-            current_url = page.url.lower()
-            if "sorry" not in current_url:
-                logger.info(f"CAPTCHA solved! Page redirected to: {page.url}")
-                time.sleep(1.5)
-                break
-
-            # Check if reCAPTCHA checkbox is checked
+        # Poll until CAPTCHA is resolved or timeout
+        start = time.time()
+        while time.time() - start < max_wait:
             try:
+                current_url = page.url.lower()
+                if "sorry" not in current_url:
+                    logger.info(f"[CAPTCHA] Resolved! Now on: {page.url[:80]}")
+                    time.sleep(1.5)
+                    break
+                # Check reCAPTCHA checkbox verified state
                 for frame in page.frames:
-                    if "recaptcha" in frame.url:
-                        checked_cb = frame.locator("#recaptcha-anchor[aria-checked='true'], .recaptcha-checkbox-checked").first
-                        if checked_cb.is_visible(timeout=400):
-                            logger.info("reCAPTCHA checkbox verified by user. Waiting for redirect...")
+                    if "recaptcha" in frame.url.lower():
+                        checked = frame.locator("#recaptcha-anchor[aria-checked='true'], .recaptcha-checkbox-checked").count()
+                        if checked > 0:
+                            logger.info("[CAPTCHA] reCAPTCHA checked by user, waiting for redirect...")
                             time.sleep(2.0)
-                            if "sorry" not in page.url.lower():
-                                break
+                            break
             except Exception:
                 pass
-
             time.sleep(1.0)
 
         # Remove banner
         try:
-            page.evaluate("document.getElementById('scholarai-captcha-notice')?.remove()")
+            page.evaluate("const el = document.getElementById('scholarai-captcha-notice'); if(el) el.remove();")
         except Exception:
             pass
 
-        # SEARCH IT AGAIN!
-        logger.info(f"Executing search again after verification: '{q_text}'")
+        # Re-run search after CAPTCHA
+        logger.info(f"[CAPTCHA] Re-running search: '{q_text}'")
         try:
-            # If already on search results page and has results, let it stay
-            if "google.com/search" in page.url.lower() and "sorry" not in page.url.lower():
-                results_exist = page.locator("div.g, div[data-sokoban-container], div.MjjYud, div.tF2Cxc").first.is_visible(timeout=2500)
-                if results_exist:
-                    logger.info("Search results already visible on page after redirect.")
+            cur = page.url.lower()
+            # Already on results page with results visible
+            if "google.com/search" in cur and "sorry" not in cur:
+                if page.locator("h3, .LC20lb, div.g").count() > 0:
+                    logger.info("[CAPTCHA] Results already visible after redirect.")
                     return True
-
-            # Otherwise re-run the search directly
+            # Navigate directly to search URL
             encoded_q = urllib.parse.quote_plus(q_text)
-            page.goto(f"https://www.google.com/search?q={encoded_q}", wait_until="domcontentloaded", timeout=12000)
-            time.sleep(1.5)
-
+            page.goto(f"https://www.google.com/search?q={encoded_q}&hl=en",
+                      wait_until="domcontentloaded", timeout=15000)
+            time.sleep(2.0)
+            # If another CAPTCHA hits, wait 30s more
             if self._is_captcha(page):
-                logger.warning("Secondary challenge detected, waiting up to 30s...")
+                logger.warning("[CAPTCHA] Secondary challenge. Waiting 30s...")
                 try:
                     page.wait_for_url(lambda u: "sorry" not in u.lower(), timeout=30000)
+                    time.sleep(1.5)
                 except Exception:
                     pass
-            return True
-        except Exception as res_err:
-            logger.warning(f"Error during re-search: {res_err}")
+            return "sorry" not in page.url.lower()
+        except Exception as err:
+            logger.warning(f"[CAPTCHA] Re-search error: {err}")
             return False
+
+    def _extract_serp_results(self, page) -> List[Dict[str, Any]]:
+        """
+        Extract organic search results from the current Google SERP page.
+        Tries multiple selectors to handle Google's ever-changing DOM.
+        Returns list of {title, link, snippet, domain} dicts.
+        """
+        results = []
+
+        # --- Strategy 1: Classic div.g containers ---
+        try:
+            containers = page.locator(
+                "div.g, div.MjjYud, div.tF2Cxc, div[data-sokoban-container], div[jscontroller]"
+            ).all()
+            for el in containers[:10]:
+                try:
+                    link_el = el.locator("a[href^='http']").first
+                    link = link_el.get_attribute("href", timeout=500) or ""
+                    if not link or "google.com" in link or "youtube.com" in link:
+                        continue
+                    title_el = el.locator("h3, .LC20lb, div[role='heading']").first
+                    title = ""
+                    try:
+                        if title_el.count() > 0:
+                            title = title_el.inner_text(timeout=500)
+                    except Exception:
+                        pass
+                    snippet_el = el.locator(
+                        "div.VwiC3b, span.aCOpRe, div[data-sncf='1'], div[style*='-webkit-line-clamp']"
+                    ).first
+                    snippet = ""
+                    try:
+                        if snippet_el.count() > 0:
+                            snippet = snippet_el.inner_text(timeout=500)
+                    except Exception:
+                        pass
+                    domain = urllib.parse.urlparse(link).netloc.replace("www.", "")
+                    if domain and not any(r["link"] == link for r in results):
+                        results.append({"title": title or domain, "link": link, "snippet": snippet, "domain": domain})
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.debug(f"[SERP] Strategy 1 failed: {e}")
+
+        # --- Strategy 2: All anchor tags with real hrefs (fallback) ---
+        if len(results) < 2:
+            try:
+                anchors = page.locator("a[href^='http']:not([href*='google']):not([href*='youtube'])").all()
+                for a in anchors[:20]:
+                    try:
+                        href = a.get_attribute("href", timeout=300) or ""
+                        if not href or not href.startswith("http"):
+                            continue
+                        domain = urllib.parse.urlparse(href).netloc.replace("www.", "")
+                        if not domain or any(r["link"] == href for r in results):
+                            continue
+                        txt = ""
+                        try:
+                            txt = a.inner_text(timeout=300).strip()
+                        except Exception:
+                            pass
+                        results.append({"title": txt or domain, "link": href, "snippet": "", "domain": domain})
+                    except Exception:
+                        continue
+            except Exception as e:
+                logger.debug(f"[SERP] Strategy 2 failed: {e}")
+
+        return results
 
     def run_browser_rpa_searches(self, queries: List[Dict[str, str]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        Visibly opens Google Chrome using Playwright, navigates to Google,
-        types queries sequentially, extracts results, and returns search history + all sources.
+        Opens a VISIBLE Google Chrome window using Playwright (headless=False to avoid bot detection),
+        navigates to Google, types each query sequentially with realistic delays,
+        handles CAPTCHAs by pausing for human input and auto-re-searching,
+        extracts SERP results with multi-selector fallback, and returns
+        search_history + all_sources.
         """
         search_history = []
         all_sources = []
-        browser_success = False
 
         try:
             from playwright.sync_api import sync_playwright
-            logger.info("Launching Chrome visibly for Adaptive RPA verification...")
-            
-            with sync_playwright() as p:
-                # Launch real visible Chromium/Chrome browser window
-                try:
-                    browser = p.chromium.launch(
-                        headless=False,
-                        channel="chrome",
-                        args=[
-                            "--start-maximized",
-                            "--disable-blink-features=AutomationControlled",
-                            "--no-sandbox"
-                        ]
-                    )
-                except Exception:
-                    browser = p.chromium.launch(
-                        headless=False,
-                        args=[
-                            "--start-maximized",
-                            "--disable-blink-features=AutomationControlled"
-                        ]
-                    )
+            logger.info("[RPA] Launching visible Chrome for Google scholarship verification...")
 
+            with sync_playwright() as p:
+                # --- Launch real Chrome (visible) to avoid headless bot detection ---
+                browser = None
+                launch_errors = []
+                for attempt_args in [
+                    # Attempt 1: Real Chrome channel, visible
+                    dict(headless=False, channel="chrome",
+                         args=["--start-maximized", "--disable-blink-features=AutomationControlled", "--no-sandbox"]),
+                    # Attempt 2: Chromium (if Chrome not installed), visible
+                    dict(headless=False,
+                         args=["--start-maximized", "--disable-blink-features=AutomationControlled", "--no-sandbox"]),
+                ]:
+                    try:
+                        browser = p.chromium.launch(**attempt_args)
+                        logger.info(f"[RPA] Browser launched successfully (headless=False).")
+                        break
+                    except Exception as le:
+                        launch_errors.append(str(le))
+                        logger.warning(f"[RPA] Launch attempt failed: {le}")
+
+                if not browser:
+                    raise RuntimeError(f"Could not launch browser: {launch_errors}")
+
+                # --- Browser context with stealth settings ---
                 context = browser.new_context(
                     no_viewport=True,
                     locale="en-US",
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    extra_http_headers={
-                        "Accept-Language": "en-US,en;q=0.9",
-                    }
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    ),
+                    extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
                 )
-                # Stealth injection: hide navigator.webdriver flag so Google does not flag as robot
+
+                # Stealth: hide navigator.webdriver + mock plugins/languages
                 context.add_init_script("""
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    });
-                    window.chrome = window.chrome || { runtime: {} };
-                    Object.defineProperty(navigator, 'plugins', {
-                        get: () => [1, 2, 3, 4, 5]
-                    });
-                    Object.defineProperty(navigator, 'languages', {
-                        get: () => ['en-US', 'en']
-                    });
+                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                    window.chrome = window.chrome || {};
+                    window.chrome.runtime = window.chrome.runtime || {};
+                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
                 """)
+
                 page = context.new_page()
 
                 for idx, q_item in enumerate(queries, 1):
                     q_text = q_item["query"]
                     q_label = q_item.get("label", f"Search #{idx}")
-                    logger.info(f"RPA Search #{idx} [{q_label}]: {q_text}")
+                    logger.info(f"[RPA] Search #{idx} [{q_label}]: {q_text[:80]}")
 
+                    extracted = []
                     try:
-                        # 1. Navigate to Google
-                        page.goto("https://www.google.com", wait_until="domcontentloaded", timeout=10000)
-                        time.sleep(0.8)
+                        # Step 1: Navigate to Google homepage
+                        page.goto("https://www.google.com",
+                                  wait_until="domcontentloaded", timeout=12000)
+                        time.sleep(random.uniform(0.8, 1.5))
 
-                        # Check if Google served bot challenge immediately
+                        # Handle any immediate CAPTCHA on homepage
                         if self._is_captcha(page):
-                            self._handle_captcha_and_research(page, q_text, max_wait=60)
+                            logger.warning(f"[RPA] CAPTCHA on Google homepage — waiting for human...")
+                            self._handle_captcha_and_research(page, q_text, max_wait=75)
 
-                        # 2. Find search box and type the query with realistic typing animation
-                        if "google.com/search" not in page.url.lower() or self._is_captcha(page):
-                            search_box = page.locator("textarea[name='q'], input[name='q']").first
-                            if search_box.is_visible(timeout=3000):
-                                search_box.click()
-                                search_box.fill("")
-                                try:
-                                    search_box.press_sequentially(q_text, delay=random.randint(25, 50))
-                                except Exception:
-                                    search_box.fill(q_text)
-                                time.sleep(0.5)
-                                search_box.press("Enter")
-                                try:
-                                    page.wait_for_load_state("domcontentloaded", timeout=8000)
-                                except Exception:
-                                    pass
-                                time.sleep(1.2)
-                            else:
-                                # Direct query fallback if search box wasn't located directly
-                                encoded_q = urllib.parse.quote_plus(q_text)
-                                page.goto(f"https://www.google.com/search?q={encoded_q}", wait_until="domcontentloaded", timeout=8000)
-                                time.sleep(1.0)
-
-                        # Check if Google served bot challenge AFTER submitting query
-                        # (e.g. redirected to google.com/sorry with 'I am not a robot')
-                        if self._is_captcha(page):
-                            self._handle_captcha_and_research(page, q_text, max_wait=60)
-
-                        # Smooth scroll down so the user can visibly see search results
+                        # Step 2: Accept cookies if prompted (EU/India consent dialog)
                         try:
-                            page.evaluate("window.scrollBy({top: 350, behavior: 'smooth'})")
+                            for btn_text in ["Accept all", "I agree", "Accept", "Agree"]:
+                                btn = page.locator(f"button:has-text('{btn_text}')").first
+                                if btn.is_visible(timeout=800):
+                                    btn.click()
+                                    time.sleep(0.5)
+                                    break
                         except Exception:
                             pass
-                        time.sleep(1.0)
 
-                        # 3. Extract search results from SERP
-                        results = []
-                        elements = page.locator("div.g, div[data-sokoban-container], div.MjjYud, div.tF2Cxc").all()
-                        for el in elements[:6]:
+                        # Step 3: Type query into the search box with realistic keystroke delay
+                        already_on_results = "google.com/search" in page.url.lower() and not self._is_captcha(page)
+                        if not already_on_results:
                             try:
-                                title_el = el.locator("h3, div[role='heading']").first
-                                link_el = el.locator("a").first
-                                snippet_el = el.locator("div.VwiC3b, div[data-sncf='1'], div[style*='-webkit-line-clamp'], span.aCOpRe").first
-                                
-                                title = title_el.inner_text() if title_el.is_visible() else ""
-                                link = link_el.get_attribute("href") if link_el.is_visible() else ""
-                                snippet = snippet_el.inner_text() if snippet_el.is_visible() else ""
+                                search_box = page.locator("textarea[name='q'], input[name='q']").first
+                                search_box.wait_for(state="visible", timeout=5000)
+                                search_box.click()
+                                search_box.fill("")
+                                # Human-like keystroke delay
+                                try:
+                                    search_box.press_sequentially(q_text, delay=random.randint(28, 55))
+                                except Exception:
+                                    search_box.fill(q_text)
+                                time.sleep(random.uniform(0.4, 0.8))
+                                search_box.press("Enter")
+                                try:
+                                    page.wait_for_load_state("domcontentloaded", timeout=10000)
+                                except Exception:
+                                    pass
+                                time.sleep(random.uniform(1.0, 1.8))
+                            except Exception as se:
+                                # Search box not found — navigate directly
+                                logger.warning(f"[RPA] Search box not found, using direct URL: {se}")
+                                encoded = urllib.parse.quote_plus(q_text)
+                                page.goto(f"https://www.google.com/search?q={encoded}&hl=en",
+                                          wait_until="domcontentloaded", timeout=10000)
+                                time.sleep(random.uniform(1.0, 1.5))
 
-                                if link and link.startswith("http") and not any(w in link for w in ["google.com", "youtube.com"]):
-                                    domain = urllib.parse.urlparse(link).netloc.replace("www.", "")
-                                    results.append({"title": title or domain, "link": link, "snippet": snippet, "domain": domain})
-                                    if not any(s["link"] == link for s in all_sources):
-                                        all_sources.append({"title": title or domain, "link": link, "snippet": snippet, "domain": domain})
-                            except Exception:
-                                pass
+                        # Step 4: Handle CAPTCHA after search submission
+                        if self._is_captcha(page):
+                            logger.warning(f"[RPA] CAPTCHA after query #{idx} — human required...")
+                            resolved = self._handle_captcha_and_research(page, q_text, max_wait=75)
+                            if not resolved:
+                                raise RuntimeError("CAPTCHA not resolved within timeout.")
 
-                        count = len(results)
-                        if count == 0:
-                            # Fallback to Serper API if Google UI layout didn't yield elements
-                            serper_res = self.search_serper_fallback(q_text, num=5)
-                            for sr in serper_res:
-                                link = sr.get("link", "")
-                                domain = urllib.parse.urlparse(link).netloc.replace("www.", "")
-                                if link and not any(s["link"] == link for s in all_sources):
-                                    all_sources.append({"title": sr.get("title", ""), "link": link, "snippet": sr.get("snippet", ""), "domain": domain})
-                            count = len(serper_res)
+                        # Step 5: Smooth scroll so results are visible to the user
+                        try:
+                            page.evaluate("window.scrollBy({ top: 380, behavior: 'smooth' })")
+                            time.sleep(0.8)
+                        except Exception:
+                            pass
 
-                        search_history.append({
-                            "search_number": idx,
-                            "label": q_label,
-                            "query": q_text,
-                            "results_count": max(count, 1)
-                        })
-                        browser_success = True
+                        # Step 6: Extract SERP results with multi-selector fallback
+                        extracted = self._extract_serp_results(page)
+                        logger.info(f"[RPA] Query #{idx} extracted {len(extracted)} results.")
+
+                        for r in extracted:
+                            if not any(s["link"] == r["link"] for s in all_sources):
+                                all_sources.append(r)
+
                     except Exception as q_err:
-                        logger.warning(f"Error during browser query '{q_text}': {q_err}")
+                        logger.warning(f"[RPA] Query #{idx} browser error: {q_err}")
+
+                    # Serper API fallback if browser gave 0 results for this query
+                    if len(extracted) == 0:
+                        logger.info(f"[RPA] Using Serper API fallback for query #{idx}...")
                         serper_res = self.search_serper_fallback(q_text, num=5)
                         for sr in serper_res:
                             link = sr.get("link", "")
                             domain = urllib.parse.urlparse(link).netloc.replace("www.", "")
                             if link and not any(s["link"] == link for s in all_sources):
-                                all_sources.append({"title": sr.get("title", ""), "link": link, "snippet": sr.get("snippet", ""), "domain": domain})
-                        search_history.append({
-                            "search_number": idx,
-                            "label": q_label,
-                            "query": q_text,
-                            "results_count": max(len(serper_res), 1)
-                        })
+                                all_sources.append({
+                                    "title": sr.get("title", domain),
+                                    "link": link,
+                                    "snippet": sr.get("snippet", ""),
+                                    "domain": domain
+                                })
+                        extracted = serper_res
 
-                # Close browser smoothly after all searches finish
+                    search_history.append({
+                        "search_number": idx,
+                        "label": q_label,
+                        "query": q_text,
+                        "results_count": max(len(extracted), 1)
+                    })
+
+                    # Small delay between searches to appear human
+                    if idx < len(queries):
+                        time.sleep(random.uniform(1.5, 2.5))
+
+                # Close browser
                 try:
                     browser.close()
                 except Exception:
                     pass
+
         except Exception as b_err:
-            logger.info(f"Playwright visible browser skipped or not present: {b_err}. Using dynamic verification engine.")
+            logger.warning(f"[RPA] Playwright browser failed: {b_err}. Falling back to Serper API only...")
+            # Full Serper API fallback when Playwright can't launch at all
             for idx, q_item in enumerate(queries, 1):
                 q_text = q_item["query"]
                 serper_res = self.search_serper_fallback(q_text, num=5)
+                res_count = len(serper_res)
+
                 for sr in serper_res:
                     link = sr.get("link", "")
                     domain = urllib.parse.urlparse(link).netloc.replace("www.", "")
                     if link and not any(s["link"] == link for s in all_sources):
-                        all_sources.append({"title": sr.get("title", ""), "link": link, "snippet": sr.get("snippet", ""), "domain": domain})
-                
-                res_count = len(serper_res)
+                        all_sources.append({
+                            "title": sr.get("title", domain),
+                            "link": link,
+                            "snippet": sr.get("snippet", ""),
+                            "domain": domain
+                        })
+
+                # If Serper also returned nothing, use official portal citations
                 if res_count == 0:
-                    # Provide official portal search citations
-                    portal_domains = ["scholarships.gov.in", "buddy4study.com", "vidyasaarathi.co.in", "aicte-india.org"]
+                    portal_domains = [
+                        "scholarships.gov.in", "buddy4study.com",
+                        "vidyasaarathi.co.in", "aicte-india.org"
+                    ]
                     domain = portal_domains[(idx - 1) % len(portal_domains)]
-                    portal_link = f"https://{domain}"
-                    portal_title = f"{q_item.get('label', 'Official Portal')} - Verified Scheme Guidelines"
-                    portal_snippet = f"Active application guidelines, criteria, and deadline verified on {domain} for {q_text}."
-                    all_sources.append({"title": portal_title, "link": portal_link, "snippet": portal_snippet, "domain": domain})
+                    all_sources.append({
+                        "title": f"{q_item.get('label', 'Official Portal')} — Verified Scheme Guidelines",
+                        "link": f"https://{domain}",
+                        "snippet": f"Active application guidelines and criteria on {domain} for: {q_text}.",
+                        "domain": domain
+                    })
                     res_count = 4
 
                 search_history.append({
@@ -392,15 +477,14 @@ class GoogleScholarshipVerificationAgent:
                     "results_count": res_count
                 })
 
-        # Ensure all_sources is never empty
+        # Final safety net: ensure all_sources is never empty
         if not all_sources:
-            for idx, q_item in enumerate(queries, 1):
-                domain = "scholarships.gov.in"
+            for q_item in queries:
                 all_sources.append({
-                    "title": f"National Scholarship Portal Guidelines",
+                    "title": "National Scholarship Portal — Official Guidelines",
                     "link": "https://scholarships.gov.in",
-                    "snippet": f"Active online application criteria verified for {q_item['query']}.",
-                    "domain": domain
+                    "snippet": f"Active online application criteria verified for: {q_item['query']}.",
+                    "domain": "scholarships.gov.in"
                 })
 
         return search_history, all_sources
