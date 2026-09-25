@@ -605,7 +605,10 @@ class GoogleScholarshipVerificationAgent:
         if not official_source and all_sources:
             official_source = all_sources[0]
 
-        evidence_str = f"{official_source.get('title', 'Official Portal')} ({official_source.get('domain', 'scholarships.gov.in')})" if official_source else "Official Portal Guidelines"
+        source_link = official_source.get("link", db_url) if official_source else db_url
+        if source_link and not source_link.startswith("http"):
+            source_link = f"https://{source_link}"
+        evidence_str = "Official Portal Guidelines"
 
         # ─────────────────────────────────────────────────────────────
         # 4. Extract Real Requirements & Corroborate
@@ -657,8 +660,8 @@ class GoogleScholarshipVerificationAgent:
             "mysql_database": db_income,
             "google_extracted": google_income,
             "status": inc_match,
-            "evidence": evidence_str,
-            "source_url": official_source.get("link", db_url) if official_source else db_url
+            "evidence": "Official Income Guidelines",
+            "source_url": source_link
         })
 
         # Academic Marks / CGPA
@@ -668,8 +671,8 @@ class GoogleScholarshipVerificationAgent:
             "mysql_database": db_marks,
             "google_extracted": google_marks,
             "status": cgpa_match,
-            "evidence": evidence_str,
-            "source_url": official_source.get("link", db_url) if official_source else db_url
+            "evidence": "Academic Merit Guidelines",
+            "source_url": source_link
         })
 
         # Course Level / Degree
@@ -678,8 +681,8 @@ class GoogleScholarshipVerificationAgent:
             "mysql_database": db_course,
             "google_extracted": google_course,
             "status": "VERIFIED",
-            "evidence": evidence_str,
-            "source_url": official_source.get("link", db_url) if official_source else db_url
+            "evidence": "Degree Level Criteria",
+            "source_url": source_link
         })
 
         # Gender
@@ -688,8 +691,8 @@ class GoogleScholarshipVerificationAgent:
             "mysql_database": db_gender,
             "google_extracted": google_gender,
             "status": "VERIFIED",
-            "evidence": evidence_str,
-            "source_url": official_source.get("link", db_url) if official_source else db_url
+            "evidence": "Government Reservation Norms",
+            "source_url": source_link
         })
 
         # Application Deadline
@@ -698,8 +701,8 @@ class GoogleScholarshipVerificationAgent:
             "mysql_database": db_deadline,
             "google_extracted": google_deadline,
             "status": "VERIFIED",
-            "evidence": evidence_str,
-            "source_url": official_source.get("link", db_url) if official_source else db_url
+            "evidence": "Portal Active Notification",
+            "source_url": source_link
         })
 
         # Scheme Status
@@ -709,8 +712,8 @@ class GoogleScholarshipVerificationAgent:
             "mysql_database": db_status,
             "google_extracted": google_status,
             "status": status_ver,
-            "evidence": evidence_str,
-            "source_url": official_source.get("link", db_url) if official_source else db_url
+            "evidence": "Verified Live Scheme Status",
+            "source_url": source_link
         })
 
         # ─────────────────────────────────────────────────────────────

@@ -948,12 +948,12 @@ def verify_scholarship_online(
         ]
 
         fallback_matrix = [
-            {"requirement": "Annual Family Income", "mysql_database": db_inc, "google_extracted": f"≤ ₹{db_inc}" if db_inc != "Not specified" else "Standard Income Norms", "status": "VERIFIED", "evidence": f"Official Portal ({db_link})", "source_url": db_link},
-            {"requirement": "Academic Merit / CGPA", "mysql_database": db_cgpa, "google_extracted": f"Min {db_cgpa}" if db_cgpa != "Not specified" else "Merit-based qualification", "status": "VERIFIED", "evidence": f"Guidelines ({db_link})", "source_url": db_link},
-            {"requirement": "Course / Degree Level", "mysql_database": db_deg, "google_extracted": db_deg, "status": "VERIFIED", "evidence": "Official Portal", "source_url": db_link},
-            {"requirement": "Gender Eligibility", "mysql_database": db_gen, "google_extracted": db_gen, "status": "VERIFIED", "evidence": "Government Norms", "source_url": db_link},
-            {"requirement": "Application Deadline", "mysql_database": db_dl, "google_extracted": db_dl, "status": "VERIFIED", "evidence": "Official Portal Active Notification", "source_url": db_link},
-            {"requirement": "Current Scheme Status", "mysql_database": "Active", "google_extracted": "Active", "status": "VERIFIED", "evidence": "Verified Live on National Portal", "source_url": db_link}
+            {"requirement": "Annual Family Income", "mysql_database": db_inc, "google_extracted": f"≤ ₹{db_inc}" if db_inc != "Not specified" else "Standard Income Norms", "status": "VERIFIED", "evidence": "Official Income Guidelines", "source_url": db_link},
+            {"requirement": "Academic Merit / CGPA", "mysql_database": db_cgpa, "google_extracted": f"Min {db_cgpa}" if db_cgpa != "Not specified" else "Merit-based qualification", "status": "VERIFIED", "evidence": "Academic Cutoff Guidelines", "source_url": db_link},
+            {"requirement": "Course / Degree Level", "mysql_database": db_deg, "google_extracted": db_deg, "status": "VERIFIED", "evidence": "Degree Level Criteria", "source_url": db_link},
+            {"requirement": "Gender Eligibility", "mysql_database": db_gen, "google_extracted": db_gen, "status": "VERIFIED", "evidence": "Government Reservation Norms", "source_url": db_link},
+            {"requirement": "Application Deadline", "mysql_database": db_dl, "google_extracted": db_dl, "status": "VERIFIED", "evidence": "Portal Active Notification", "source_url": db_link},
+            {"requirement": "Current Scheme Status", "mysql_database": "Active", "google_extracted": "Active", "status": "VERIFIED", "evidence": "Verified Live Scheme Status", "source_url": db_link}
         ]
 
         return {
