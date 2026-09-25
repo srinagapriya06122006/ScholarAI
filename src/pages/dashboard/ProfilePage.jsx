@@ -172,9 +172,9 @@ export const ProfilePage = () => {
     api.put('/profile', payload)
       .then((res) => {
         setCompletionScore(res.data.completionScore);
-        showToast('Profile saved successfully! Resuming AI Autopilot workflow...', 'success');
+        showToast('Profile saved successfully! Updating your scholarship journey...', 'success');
         
-        // Trigger Supervisor pipeline update and return to Dashboard Control Center
+        // Trigger Supervisor pipeline update and return to Dashboard
         api.post('/agent/run')
           .finally(() => {
             setTimeout(() => {

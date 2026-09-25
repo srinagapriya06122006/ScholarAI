@@ -47,4 +47,21 @@ api.interceptors.response.use(
   }
 );
 
+// Document Collection Browser Automation API
+export const startDocumentCollection = (document_type, open_browser = true) =>
+  api.post('/agent/documents/collect/start', { document_type, open_browser });
+
+export const confirmHumanVerification = (document_type) =>
+  api.post('/agent/documents/collect/verify-human', { document_type });
+
+export const getDocumentCollectionStatus = (document_type) =>
+  api.get('/agent/documents/collect/status', { params: { document_type } });
+
+export const recordManualDocumentAccess = (document_type) =>
+  api.post('/agent/documents/collect/manual', { document_type });
+
+export const verifyDocument = (document_type) =>
+  api.post(`/documents/${document_type}/verify`);
+
 export default api;
+

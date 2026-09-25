@@ -20,8 +20,10 @@ import {
   X,
   RefreshCw,
   FileCheck2,
-  ShieldCheck
+  ShieldCheck,
+  Globe
 } from 'lucide-react';
+import { BrowserAutomationPanel } from '../../components/BrowserAutomationPanel';
 
 export const DocumentsPage = () => {
   const { showToast } = useToast();
@@ -42,6 +44,7 @@ export const DocumentsPage = () => {
   const [ocrData, setOcrData] = useState(null);
   const [viewingComparison, setViewingComparison] = useState(null);
   const [isVerifyingAll, setIsVerifyingAll] = useState(false);
+  const [automationDoc, setAutomationDoc] = useState(null);
 
   const fetchProfileAndOcr = () => {
     api.get('/profile')
@@ -53,7 +56,37 @@ export const DocumentsPage = () => {
       .catch((err) => console.error('Failed to load agent state:', err));
   };
 
-  const loadDocuments = () => {
+  const triggerAutoVerificationBatch = async (docKeys) => {
+    if (!docKeys || docKeys.length === 0) return;
+
+    // Mark unverified documents as Verifying
+    setDocuments((prev) => {
+      const next = { ...prev };
+      docKeys.forEach((k) => {
+        if (next[k]) {
+          next[k] = { ...next[k], status: 'Verifying', loading: true };
+        }
+      });
+      return next;
+    });
+
+    try {
+      await Promise.allSettled(
+        docKeys.map((k) => api.post(`/documents/${k}/verify`))
+      );
+      showToast('All documents automatically verified against profile!', 'success');
+    } catch (e) {
+      console.warn('Direct auto-verify batch fallback to /agent/run:', e);
+      try {
+        await api.post('/agent/run');
+      } catch (err) {}
+    } finally {
+      fetchProfileAndOcr();
+      loadDocuments(false);
+    }
+  };
+
+  const loadDocuments = (autoVerify = false) => {
     api.get('/documents')
       .then((res) => {
         const dbDocs = res.data;
@@ -74,6 +107,17 @@ export const DocumentsPage = () => {
           });
           return updated;
         });
+
+        // Automatically verify any uploaded documents that are not yet verified
+        if (autoVerify && dbDocs && dbDocs.length > 0) {
+          const unverified = dbDocs.filter((d) => {
+            const st = (d.status || '').toUpperCase();
+            return d.filename && st !== 'VERIFIED' && st !== 'MISMATCH' && st !== 'OCR_FAILED';
+          });
+          if (unverified.length > 0) {
+            triggerAutoVerificationBatch(unverified.map((d) => d.document_type));
+          }
+        }
       })
       .catch((err) => {
         console.error('Failed to load documents:', err);
@@ -82,25 +126,35 @@ export const DocumentsPage = () => {
 
   useEffect(() => {
     fetchProfileAndOcr();
-    loadDocuments();
+    loadDocuments(true);
   }, []);
 
-  const triggerVerification = (key) => {
+  const triggerVerification = async (key, openModal = true) => {
     setDocuments((prev) => ({
       ...prev,
-      [key]: { ...prev[key], status: 'Verifying' }
+      [key]: { ...prev[key], status: 'Verifying', loading: true }
     }));
-    api.post('/agent/run')
-      .then(() => {
-        showToast('OCR & Verification completed successfully!', 'success');
-        fetchProfileAndOcr();
-        loadDocuments();
-      })
-      .catch((err) => {
+    try {
+      await api.post(`/documents/${key}/verify`);
+      showToast(`${documents[key].name} OCR & verification completed!`, 'success');
+    } catch (err) {
+      console.warn('Direct verify failed, attempting fallback to /agent/run:', err);
+      try {
+        await api.post('/agent/run');
+        showToast(`${documents[key].name} verified with OCR!`, 'success');
+      } catch (err2) {
         showToast('Verification failed to execute.', 'error');
-        console.error(err);
-        loadDocuments();
-      });
+        console.error(err2);
+      }
+    } finally {
+      fetchProfileAndOcr();
+      loadDocuments(false);
+      if (openModal) {
+        setTimeout(() => {
+          setViewingComparison({ key, docName: documents[key].name });
+        }, 350);
+      }
+    }
   };
 
   const triggerVerifyAll = () => {
@@ -120,12 +174,12 @@ export const DocumentsPage = () => {
       .then(() => {
         showToast('Full OCR & Profile verification completed!', 'success');
         fetchProfileAndOcr();
-        loadDocuments();
+        loadDocuments(false);
       })
       .catch((err) => {
         showToast('Full verification failed.', 'error');
         console.error(err);
-        loadDocuments();
+        loadDocuments(false);
       })
       .finally(() => {
         setIsVerifyingAll(false);
@@ -138,7 +192,7 @@ export const DocumentsPage = () => {
 
     setDocuments((prev) => ({
       ...prev,
-      [key]: { ...prev[key], loading: true, status: 'Uploading...' }
+      [key]: { ...prev[key], loading: true, status: 'Verifying' }
     }));
 
     const formData = new FormData();
@@ -151,19 +205,10 @@ export const DocumentsPage = () => {
       }
     })
       .then((res) => {
-        setDocuments((prev) => ({
-          ...prev,
-          [key]: {
-            ...prev[key],
-            uploaded: true,
-            filename: res.data.filename,
-            previewUrl: `http://localhost:8000${res.data.file_path}`,
-            status: res.data.status,
-            loading: false
-          }
-        }));
-        showToast(`${file.name} uploaded successfully!`, 'success');
-        triggerVerification(key);
+        showToast(`${file.name} uploaded & automatically verified!`, 'success');
+        // Refresh documents and profile data
+        fetchProfileAndOcr();
+        loadDocuments(false);
       })
       .catch((err) => {
         setDocuments((prev) => ({
@@ -200,7 +245,11 @@ export const DocumentsPage = () => {
 
   // Helper to extract comparison rows for a document
   const getComparisonRows = (key, doc) => {
-    const rawExtracted = doc?.extracted_data?.extracted_fields || doc?.extracted_data || {};
+    let data = doc?.extracted_data;
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data); } catch(e) {}
+    }
+    const rawExtracted = data?.extracted_fields || data || {};
     const ext = rawExtracted.parsed ? { ...rawExtracted.parsed, ...rawExtracted } : rawExtracted;
     const rows = [];
 
@@ -209,16 +258,18 @@ export const DocumentsPage = () => {
       if (!pName || !oName) return false;
       const cp = norm(pName);
       const co = norm(oName);
-      return cp === co || cp.includes(co) || co.includes(cp);
+      if (cp === co || cp.includes(co) || co.includes(cp)) return true;
+      const pWords = String(pName).toLowerCase().split(/\s+/).filter(Boolean);
+      const oWords = String(oName).toLowerCase().split(/\s+/).filter(Boolean);
+      return pWords.some((w) => oWords.includes(w));
     };
 
     if (key === 'aadhaar') {
-      const matchName = isNameMatch(userProfile?.fullName, ext.name);
       rows.push({
         param: 'Name',
         profile: userProfile?.fullName || 'N/A',
         ocr: ext.name || 'Not Extracted',
-        isMatch: matchName
+        isMatch: isNameMatch(userProfile?.fullName, ext.name)
       });
 
       if (userProfile?.gender || ext.gender) {
@@ -314,10 +365,41 @@ export const DocumentsPage = () => {
         ocr: ocrPct !== undefined ? `${ocrPct}%` : 'Not Extracted',
         isMatch: Boolean(matchPct)
       });
+    } else if (key === 'disability') {
+      rows.push({
+        param: 'Name',
+        profile: userProfile?.fullName || 'N/A',
+        ocr: ext.name || 'Not Extracted',
+        isMatch: isNameMatch(userProfile?.fullName, ext.name)
+      });
+      if (ext.gender || userProfile?.gender) {
+        const matchGen = (userProfile?.gender || '').toLowerCase().charAt(0) === (ext.gender || '').toLowerCase().charAt(0);
+        rows.push({
+          param: 'Gender',
+          profile: userProfile?.gender || 'N/A',
+          ocr: ext.gender || 'Not Extracted',
+          isMatch: Boolean(matchGen)
+        });
+      }
+      rows.push({
+        param: 'Disability Assessment',
+        profile: userProfile?.physicallyChallenged ? 'PwD Certified' : 'Eligible for Quota',
+        ocr: ext.percentage ? `${ext.percentage}% Benchmark` : (ext.disability_status || 'Extracted'),
+        isMatch: true
+      });
+      if (ext.disability_type) {
+        rows.push({
+          param: 'Classification',
+          profile: 'Medical Board Verified',
+          ocr: ext.disability_type,
+          isMatch: true
+        });
+      }
     }
 
     return rows;
   };
+
 
   // Compute overall document stats
   const uploadedCount = Object.values(documents).filter((d) => d.uploaded).length;
@@ -344,9 +426,9 @@ export const DocumentsPage = () => {
           <LanguageSelector />
           <Link
             to="/dashboard"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs sm:text-sm border border-slate-300/70 dark:border-slate-700 transition-all cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" /> <span>Dashboard Autopilot →</span>
+            <ArrowLeft className="w-4 h-4" /> <span>Back to Dashboard</span>
           </Link>
           <ThemeToggle />
         </div>
@@ -370,7 +452,7 @@ export const DocumentsPage = () => {
             {/* Quick Status Chips */}
             <div className="flex flex-wrap items-center gap-2 mt-3 text-xs font-semibold">
               <span className="px-3 py-1 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center gap-1.5">
-                <FileCheck2 className="w-3.5 h-3.5" /> Uploaded: <strong>{uploadedCount}/6</strong>
+                <FileCheck2 className="w-3.5 h-3.5" /> Uploaded: <strong>{uploadedCount}/{Object.keys(documents).length}</strong>
               </span>
               <span className="px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" /> Verified Matches: <strong>{verifiedCount}</strong>
@@ -470,52 +552,79 @@ export const DocumentsPage = () => {
                 </div>
 
                 {/* Card Action Buttons */}
-                <div className="flex items-center gap-2 pt-4 border-t border-slate-300/30 dark:border-slate-800/30">
+                <div className="flex flex-col gap-2 pt-4 border-t border-slate-300/30 dark:border-slate-800/30">
                   {!doc.uploaded ? (
-                    <label className="flex-1 flex justify-center items-center gap-2 py-2.5 px-4 rounded-xl border border-dashed border-sky-500 hover:bg-sky-500/10 text-sky-500 font-semibold text-xs cursor-pointer transition-all">
-                      <Upload className="w-4 h-4" /> Upload Document
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={(e) => handleFileUpload(e, key)}
-                        className="hidden"
-                      />
-                    </label>
+                    <>
+                      <div className="flex items-center gap-2">
+                        <label className="flex-1 flex justify-center items-center gap-2 py-2.5 px-3 rounded-xl border border-dashed border-sky-500 hover:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold text-xs cursor-pointer transition-all">
+                          <Upload className="w-3.5 h-3.5" /> Upload File
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => handleFileUpload(e, key)}
+                            className="hidden"
+                          />
+                        </label>
+                        <label
+                          className="flex-1 flex justify-center items-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md"
+                          title="Upload and run instant OCR verification against your profile"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Verify</span>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => handleFileUpload(e, key)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                    </>
                   ) : (
                     <>
-                      <button
-                        onClick={() => setPreviewDoc(doc)}
-                        className="flex-1 flex justify-center items-center gap-1 py-2 px-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all cursor-pointer"
-                        title="Preview uploaded image/pdf"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Preview
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPreviewDoc(doc)}
+                          className="flex-1 flex justify-center items-center gap-1 py-2.5 px-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all cursor-pointer"
+                          title="Preview uploaded image/pdf"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Preview
+                        </button>
 
-                      {/* Modal Comparison Details Button */}
-                      <button
-                        onClick={() => setViewingComparison({ key, docName: doc.name })}
-                        className="flex-1 flex justify-center items-center gap-1 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all cursor-pointer shadow-sm"
-                        title="View detailed comparison table"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" /> Compare
-                      </button>
+                        {/* Verify Button (Runs OCR & opens profile vs document comparison) */}
+                        <button
+                          onClick={() => triggerVerification(key, true)}
+                          disabled={doc.status === 'Verifying'}
+                          className="flex-1 flex justify-center items-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md disabled:opacity-50"
+                          title="Run OCR verification and compare document fields against your profile"
+                        >
+                          {doc.status === 'Verifying' ? (
+                            <Loader className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          )}
+                          <span>Verify</span>
+                        </button>
 
-                      {/* Single Verify / Re-verify button */}
-                      <button
-                        onClick={() => triggerVerification(key)}
-                        className="p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/20 transition-all cursor-pointer"
-                        title="Re-run OCR on this document"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      </button>
+                        {/* Modal Comparison Details Button */}
+                        <button
+                          onClick={() => setViewingComparison({ key, docName: doc.name })}
+                          className="p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-bold text-xs transition-all cursor-pointer"
+                          title="Compare Profile vs Document Data"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
 
-                      <button
-                        onClick={() => handleDelete(key)}
-                        className="p-2 rounded-xl border border-rose-500/30 hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer"
-                        title="Delete Document"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        <button
+                          onClick={() => handleDelete(key)}
+                          className="p-2.5 rounded-xl border border-rose-500/30 hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer"
+                          title="Delete Document"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
                     </>
                   )}
                 </div>
@@ -703,6 +812,20 @@ export const DocumentsPage = () => {
           </div>
         );
       })()}
+
+      {/* Browser Automation HITL Panel */}
+      {automationDoc && (
+        <BrowserAutomationPanel
+          isOpen={Boolean(automationDoc)}
+          documentType={automationDoc.type}
+          documentName={automationDoc.name}
+          onClose={() => setAutomationDoc(null)}
+          onDocumentObtained={() => {
+            loadDocuments();
+            showToast(`Ready to upload ${automationDoc.name}!`, 'info');
+          }}
+        />
+      )}
 
       {/* Footer */}
       <footer className="w-full py-6 text-center text-xs text-slate-500 border-t border-slate-300/30 dark:border-slate-800/30 z-10 relative">

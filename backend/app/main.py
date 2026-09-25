@@ -349,6 +349,108 @@ def update_profile(profile_in: schemas.UserProfileCreate, current_user: models.U
 def read_documents(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.get_user_documents(db, current_user.id)
 
+def perform_document_verification(db: Session, user_id: int, doc_type: str):
+    from .agent.ocr_agent import OCRAgent
+    from .agent.verification_agent import VerificationAgent
+    
+    docs = crud.get_user_documents(db, user_id)
+    target_doc = next((d for d in docs if d.document_type.lower() == doc_type.lower()), None)
+    
+    if not target_doc:
+        raise HTTPException(status_code=404, detail=f"No document uploaded for '{doc_type}'. Please upload first.")
+        
+    ocr_agent = OCRAgent(db)
+    verification_agent = VerificationAgent(db)
+    
+    # 1. Run OCR extraction
+    target_doc.status = "OCR_PROCESSING"
+    db.add(target_doc)
+    db.commit()
+    
+    extracted = ocr_agent.extract_data(user_id, target_doc.document_type, target_doc.file_path)
+    
+    if extracted.get("status") in ("ocr_failed", "error"):
+        target_doc.status = "OCR_FAILED"
+        target_doc.extracted_data = json.dumps({
+            "ocr_status": "OCR_FAILED",
+            "error_message": extracted.get("error_message") or extracted.get("message", "OCR processing failed."),
+            "extracted_fields": extracted.get("parsed", {}),
+            "processed_timestamp": datetime.now().isoformat()
+        })
+        db.add(target_doc)
+        db.commit()
+        return {
+            "status": "OCR_FAILED",
+            "document_type": target_doc.document_type,
+            "filename": target_doc.filename,
+            "file_path": target_doc.file_path,
+            "extracted_data": json.loads(target_doc.extracted_data),
+            "message": "OCR text extraction failed for this document."
+        }
+        
+    target_doc.status = "OCR_COMPLETED"
+    target_doc.extracted_data = json.dumps({
+        "ocr_status": "OCR_COMPLETED",
+        "raw_text": extracted.get("raw_text", ""),
+        "extracted_fields": extracted,
+        "processed_timestamp": datetime.now().isoformat()
+    })
+    db.add(target_doc)
+    db.commit()
+    
+    # 2. Run Verification Agent (Compare OCR vs Profile)
+    verify_res = verification_agent.verify_single_document(user_id, target_doc)
+    target_doc.status = verify_res.get("status", "VERIFIED")
+    
+    # Store reasons and mismatch_fields in extracted_data
+    existing_ext = json.loads(target_doc.extracted_data) if isinstance(target_doc.extracted_data, str) else target_doc.extracted_data
+    existing_ext["verification_status"] = target_doc.status
+    existing_ext["reasons"] = verify_res.get("reasons", [])
+    existing_ext["mismatch_fields"] = verify_res.get("mismatch_fields", {})
+    target_doc.extracted_data = json.dumps(existing_ext)
+    db.add(target_doc)
+    db.commit()
+    db.refresh(target_doc)
+    
+    # Sync to OCRData model as well
+    ocr_model = crud.get_ocr_data(db, user_id)
+    fields = extracted
+    if fields.get("name") and not ocr_model.name:
+        ocr_model.name = fields.get("name")
+    if fields.get("gender") and not ocr_model.gender:
+        ocr_model.gender = fields.get("gender")
+    if fields.get("state") and not ocr_model.state:
+        ocr_model.state = fields.get("state")
+    if (fields.get("annual_income") or fields.get("income")) and ocr_model.income is None:
+        try:
+            ocr_model.income = float(fields.get("annual_income") or fields.get("income"))
+        except Exception:
+            pass
+    if (fields.get("category") or fields.get("community")) and not ocr_model.community:
+        ocr_model.community = fields.get("category") or fields.get("community")
+    if fields.get("cgpa") is not None and ocr_model.cgpa is None:
+        try:
+            ocr_model.cgpa = float(fields.get("cgpa"))
+        except Exception:
+            pass
+    if (fields.get("calculated_percentage") or fields.get("percentage") or fields.get("marks")) and ocr_model.marks is None:
+        try:
+            ocr_model.marks = float(fields.get("calculated_percentage") or fields.get("percentage") or fields.get("marks"))
+        except Exception:
+            pass
+    db.add(ocr_model)
+    db.commit()
+    
+    parsed_extracted = json.loads(target_doc.extracted_data) if isinstance(target_doc.extracted_data, str) else target_doc.extracted_data
+    return {
+        "status": target_doc.status,
+        "document_type": target_doc.document_type,
+        "filename": target_doc.filename,
+        "file_path": target_doc.file_path,
+        "extracted_data": parsed_extracted,
+        "verification": verify_res
+    }
+
 @app.post("/api/v1/documents/upload")
 def upload_document(
     document_type: str = Form(...),
@@ -364,10 +466,18 @@ def upload_document(
         buffer.write(file.file.read())
         
     doc = crud.create_or_update_document(db, current_user.id, document_type, filename, f"/uploads/{filename}")
+    doc.status = "Uploaded"
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    
+    # Automatically verify immediately on upload (autonomous verification)
     try:
-        run_supervisor_agent(db, current_user.id, event="DOCUMENT_UPLOADED")
+        perform_document_verification(db, current_user.id, document_type)
+        db.refresh(doc)
     except Exception as e:
-        print(f"Error auto-running supervisor agent on upload: {e}")
+        print(f"[Upload Auto-Verification Error] {e}")
+        
     return doc
 
 @app.delete("/api/v1/documents/{doc_type}")
@@ -376,6 +486,11 @@ def delete_document(doc_type: str, current_user: models.User = Depends(get_curre
     if not success:
         raise HTTPException(status_code=404, detail="Document not found.")
     return {"message": "Document deleted successfully."}
+
+@app.post("/api/v1/documents/{doc_type}/verify")
+def verify_document_endpoint(doc_type: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return perform_document_verification(db, current_user.id, doc_type)
+
 
 @app.get("/api/v1/scholarships")
 @app.get("/api/scholarships")
@@ -717,6 +832,63 @@ def start_agent_journey(scholarship_id: Optional[int] = None, current_user: mode
 @app.post("/api/v1/agent/journey/reset", response_model=schemas.AgentWorkflowStateResponse)
 def reset_agent_journey(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.reset_agent_workflow_state(db, current_user.id)
+
+# ─────────────────────────────────────────────────────────────────────────
+# Human-in-the-Loop Document Collection Endpoints
+# ─────────────────────────────────────────────────────────────────────────
+@app.post("/api/v1/agent/documents/collect/start", response_model=schemas.DocumentCollectionStatusResponse)
+def start_document_collection(
+    payload: schemas.DocumentCollectionStartRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from .agent.supervisor import SupervisorAgent
+    supervisor = SupervisorAgent(db)
+    return supervisor.start_document_collection(
+        user_id=current_user.id,
+        document_type=payload.document_type,
+        open_browser=payload.open_browser if payload.open_browser is not None else True
+    )
+
+@app.post("/api/v1/agent/documents/collect/verify-human", response_model=schemas.DocumentCollectionStatusResponse)
+def confirm_human_verification(
+    payload: schemas.HumanVerificationConfirmRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from .agent.supervisor import SupervisorAgent
+    supervisor = SupervisorAgent(db)
+    return supervisor.confirm_human_verification(
+        user_id=current_user.id,
+        document_type=payload.document_type
+    )
+
+@app.get("/api/v1/agent/documents/collect/status", response_model=schemas.DocumentCollectionStatusResponse)
+def get_document_collection_status(
+    document_type: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from .agent.supervisor import SupervisorAgent
+    supervisor = SupervisorAgent(db)
+    return supervisor.get_document_collection_status(
+        user_id=current_user.id,
+        document_type=document_type
+    )
+
+@app.post("/api/v1/agent/documents/collect/manual", response_model=schemas.DocumentCollectionStatusResponse)
+def record_manual_document_access(
+    payload: schemas.HumanVerificationConfirmRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from .agent.supervisor import SupervisorAgent
+    supervisor = SupervisorAgent(db)
+    return supervisor.record_manual_document_access(
+        user_id=current_user.id,
+        document_type=payload.document_type
+    )
+
 
 @app.post("/api/v1/agent/verify-scholarship")
 def verify_scholarship_online(
@@ -1099,6 +1271,24 @@ def generate_document(
             "percentage": percentage,
             "marks": percentage,
             "board": fields.get("board", "Tamil Nadu State Board")
+        })
+    elif document_type == "disability":
+        name = fields.get("name") or current_user.fullName
+        disability_type = fields.get("disability_type") or "Locomotor Disability"
+        percentage = float(fields.get("percentage") or fields.get("disability_percentage") or 45.0)
+        cert_no = fields.get("certificate_no") or "DIS-TN-2024-00842"
+        hospital = fields.get("issuing_hospital") or fields.get("hospital") or "District Medical Board, Government General Hospital"
+        date_issued = fields.get("date") or "12-04-2023"
+        
+        ocr_data.name = name
+        extracted_fields.update({
+            "name": name,
+            "disability_type": disability_type,
+            "disability_status": "Eligible",
+            "percentage": percentage,
+            "certificate_no": cert_no,
+            "issuing_authority": hospital,
+            "date": date_issued
         })
             
     doc.extracted_data = json.dumps({

@@ -37,6 +37,7 @@ class TesseractOCREngine(BaseOCREngine):
             "twelfth": "12th Marksheet",
             "college": "College Transcript",
             "college_id": "College ID",
+            "disability": "Disability Certificate",
             "Unknown": "Unknown Document"
         }
 
@@ -83,6 +84,8 @@ class TesseractOCREngine(BaseOCREngine):
                         return candidate
                     if expected_type in ("tenth", "twelfth") and parsed.get("calculated_percentage") is not None:
                         return candidate
+                    if expected_type == "disability" and parsed.get("name") is not None:
+                        return candidate
                     
                     if not best_text:
                         best_text = candidate
@@ -105,6 +108,8 @@ class TesseractOCREngine(BaseOCREngine):
                     if expected_type == "aadhaar" and parsed.get("name") is not None:
                         return candidate
                     if expected_type in ("tenth", "twelfth") and parsed.get("calculated_percentage") is not None:
+                        return candidate
+                    if expected_type == "disability" and parsed.get("name") is not None:
                         return candidate
             except Exception as e:
                 print(f"[OCR Pipeline Preprocessed] Exception on PSM {psm_flag}: {e}")
@@ -233,7 +238,72 @@ class TesseractOCREngine(BaseOCREngine):
             return self._parse_college(text)
         elif doc_type in ("tenth", "twelfth"):
             return self._parse_marks(text, doc_type)
+        elif doc_type == "disability":
+            return self._parse_disability(text)
         return {}
+
+    def _parse_disability(self, text: str) -> dict:
+        result = {}
+        # 1. Name: "carefully examined ANU, Son" or "carefully examined [Name]"
+        m_name = re.search(r"carefully\s+examined\s+([A-Za-z\s\.]+?)(?:,|\s+Son|\s+Daughter|\s+Ward|\n)", text, re.IGNORECASE)
+        if m_name:
+            val = m_name.group(1).strip()
+            val_clean = re.sub(r'[^a-zA-Z\s\.]', '', val).strip()
+            if len(val_clean) >= 2:
+                result["name"] = val_clean
+
+        if not result.get("name"):
+            m_name2 = re.search(r"(?:Name|Applicant Name)\s*[:/]\s*([A-Za-z\s\.]+)", text, re.IGNORECASE)
+            if m_name2:
+                val_clean = re.sub(r'[^a-zA-Z\s\.]', '', m_name2.group(1)).strip()
+                if len(val_clean) >= 2:
+                    result["name"] = val_clean
+
+        # 2. Certificate No
+        m_cert = re.search(r"Certificate\s*(?:No|Number)\s*[:/]?\s*([A-Za-z0-9\-]+)", text, re.IGNORECASE)
+        if m_cert:
+            result["certificate_no"] = m_cert.group(1).strip()
+
+        # 3. DOB
+        m_dob = re.search(r"DOB\s*[:/]?\s*(\d{4}[-/]\d{2}[-/]\d{2}|\d{2}[-/]\d{2}[-/]\d{4})", text, re.IGNORECASE)
+        if m_dob:
+            result["dob"] = m_dob.group(1).strip()
+
+        # 4. Gender
+        m_gen = re.search(r"Gender\s*[:/]?\s*(MALE|FEMALE|TRANSGENDER|OTHER)", text, re.IGNORECASE)
+        if m_gen:
+            result["gender"] = m_gen.group(1).strip().upper()
+
+        # 5. Percentage
+        m_pct = re.search(r"(?:DISABILITY\s+ASSESSMENT|Disability\s+Percentage|Percentage|assessment)\D*?(\d{1,3})\s*%", text, re.IGNORECASE)
+        if m_pct:
+            result["percentage"] = m_pct.group(1).strip()
+        else:
+            m_pct2 = re.search(r"(\d{1,3})\s*%\s*(?:benchmark\s+disability)?", text, re.IGNORECASE)
+            if m_pct2:
+                result["percentage"] = m_pct2.group(1).strip()
+
+        # 6. Disability classification / type
+        m_type = re.search(r"(?:Disability\s+Classification|Disability\s+Type)\s*[:/]?\s*\n?([^\n]+)", text, re.IGNORECASE)
+        if m_type:
+            val = m_type.group(1).strip()
+            if val and len(val) >= 3 and not val.lower().startswith("medical"):
+                result["disability_type"] = val
+
+        # 7. Diagnosis
+        m_diag = re.search(r"Diagnosis\s*[:/]?\s*\n?([^\n]+)", text, re.IGNORECASE)
+        if m_diag:
+            val = m_diag.group(1).strip()
+            if val and len(val) >= 3 and not val.lower().startswith("medical"):
+                result["diagnosis"] = val
+
+        # 8. Date of Issue
+        m_date = re.search(r"Date\s+(?:of\s+Issue)?\s*[:/]?\s*(\d{4}[-/]\d{2}[-/]\d{2}|\d{2}[-/]\d{2}[-/]\d{4})", text, re.IGNORECASE)
+        if m_date:
+            result["date"] = m_date.group(1).strip()
+
+        result["disability_status"] = "Verified PwD"
+        return result
 
     def _parse_aadhaar(self, text: str) -> dict:
         result = {}
@@ -781,6 +851,19 @@ class OCRAgent:
                 "calculated_percentage": extracted.get("calculated_percentage") or extracted.get("percentage") or extracted.get("marks"),
                 "printed_percentage": extracted.get("printed_percentage") or extracted.get("percentage") or extracted.get("marks"),
                 "board": extracted.get("board")
+            }
+        elif document_type == "disability":
+            complete_data = {
+                "document_type": "disability",
+                "name": extracted.get("name"),
+                "dob": extracted.get("dob"),
+                "gender": extracted.get("gender"),
+                "disability_type": extracted.get("disability_type"),
+                "percentage": extracted.get("percentage"),
+                "diagnosis": extracted.get("diagnosis"),
+                "certificate_no": extracted.get("certificate_no"),
+                "date": extracted.get("date"),
+                "disability_status": extracted.get("disability_status", "Verified PwD")
             }
 
         if extracted.get("classification_warning"):

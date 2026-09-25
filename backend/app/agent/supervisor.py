@@ -11,6 +11,7 @@ from .document_agent import RequiredDocumentAgent
 from .ocr_agent import OCRAgent
 from .verification_agent import VerificationAgent
 from .recommendation_agent import AIRecommendationAgent
+from .document_collector_agent import DocumentCollectorAgent, WORKFLOW_STATES
 
 import sys
 
@@ -96,6 +97,7 @@ class SupervisorAgent:
         self.ocr_agent = OCRAgent(db)
         self.verification_agent = VerificationAgent(db)
         self.recommendation_agent = AIRecommendationAgent(db)
+        self.collector_agent = DocumentCollectorAgent(db)
 
     def create_plan(self, context: WorkflowContext) -> List[str]:
         """
@@ -612,6 +614,25 @@ class SupervisorAgent:
             "ai_explanation": context.ai_explanation,
             "ocr_data": ocr_dict
         }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Human-in-the-Loop Document Collection Browser Automation
+    # ─────────────────────────────────────────────────────────────────────────
+    def start_document_collection(self, user_id: int, document_type: str, open_browser: bool = True) -> dict:
+        """Starts HITL browser automation to collect a required certificate from its official portal."""
+        return self.collector_agent.start_collection(user_id, document_type, open_browser_window=open_browser)
+
+    def confirm_human_verification(self, user_id: int, document_type: str) -> dict:
+        """Resumes workflow after user verifies in browser."""
+        return self.collector_agent.confirm_human_verification(user_id, document_type)
+
+    def record_manual_document_access(self, user_id: int, document_type: str) -> dict:
+        """Records student choice to access portal manually."""
+        return self.collector_agent.record_manual_access(user_id, document_type)
+
+    def get_document_collection_status(self, user_id: int, document_type: str) -> dict:
+        """Retrieves real-time automation state for a document."""
+        return self.collector_agent.get_status(user_id, document_type)
 
 
 def run_supervisor_agent(db: Session, user_id: int, scholarship_id: Optional[int] = None, event: str = "EVALUATE") -> dict:

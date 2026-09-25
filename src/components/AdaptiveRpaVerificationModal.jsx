@@ -63,7 +63,7 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
         scholarship_type: scholarship?.scholarship_type,
         year_of_study: scholarship?.year_of_study,
       },
-      { timeout: 90000 }
+      { timeout: 120000 }
     )
       .then((res) => {
         clearInterval(stepInterval);
@@ -225,8 +225,9 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
                 </div>
               </div>
 
-              <p className="text-[11px] text-slate-500 mt-4">
-                Playwright / Chrome RPA is executing live queries on your system.
+              <p className="text-[11px] text-slate-400 mt-4 flex items-center justify-center gap-1.5">
+                <span>🤖</span>
+                <span>Playwright / Chrome RPA is executing live queries. If Google shows <b>"I'm not a robot"</b>, click it and the search will automatically re-run!</span>
               </p>
             </div>
           )}

@@ -30,6 +30,12 @@ class DocumentClassificationAgent:
                 "statement of grades", "grades", "provisional certificate", 
                 "consolidated mark", "semester", "cgpa", "sgpa", "transcript", 
                 "grade point", "sona college", "student id card", "identity card", "roll number", "roll no", "valid uptol", "student identity card"
+            ],
+            "disability": [
+                "certificate of disability", "disability", "disabilities",
+                "medical board", "rights of persons with disabilities",
+                "udid", "locomotor disability", "permanent disability assessment",
+                "benchmark disability"
             ]
         }
 

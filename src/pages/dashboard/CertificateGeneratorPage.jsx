@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../components/Toast';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { LanguageSelector } from '../../components/LanguageSelector';
@@ -18,8 +18,10 @@ import {
 export const CertificateGeneratorPage = () => {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialType = searchParams.get('type') || 'aadhaar';
 
-  const [activeDocType, setActiveDocType] = useState('aadhaar');
+  const [activeDocType, setActiveDocType] = useState(initialType);
   const [profile, setProfile] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -105,6 +107,19 @@ export const CertificateGeneratorPage = () => {
         biology: '168',
         mathematics: '164'
       }
+    },
+    // Disability Certificate
+    disability: {
+      certificate_no: 'DIS-TN-2024-00842',
+      date: '12-04-2023',
+      name: '',
+      father_name: 'K. Senthil Kumar',
+      dob: '2004-05-14',
+      gender: 'MALE',
+      disability_type: 'Locomotor Disability (Orthopedic)',
+      percentage: '45',
+      diagnosis: 'Post-polio residual paralysis of left lower limb',
+      issuing_hospital: 'District Medical Board, Government General Hospital, Tamil Nadu'
     }
   });
 
@@ -186,6 +201,17 @@ export const CertificateGeneratorPage = () => {
             mathematics: String(Math.min(200, Math.round(base200 * 1.02)))
           };
         }
+      }
+
+      // Disability Certificate
+      if (nameVal) u.disability.name = nameVal;
+      if (p.dob) u.disability.dob = p.dob;
+      if (p.gender) u.disability.gender = p.gender.toUpperCase();
+      if (p.state) u.disability.issuing_hospital = `District Medical Board, Government General Hospital, ${p.state}`;
+      if (p.disabilityPercentage) {
+        u.disability.percentage = String(p.disabilityPercentage);
+      } else {
+        u.disability.percentage = '45';
       }
 
       return u;
@@ -287,11 +313,16 @@ export const CertificateGeneratorPage = () => {
                 let fallback = '#000000';
                 if (prop === 'background-color') {
                   fallback = el.className.includes('bg-white') ? '#ffffff' : 
+                             el.className.includes('bg-indigo-50') ? '#eef2ff' :
                              el.className.includes('bg-slate-50') ? '#f8fafc' : 
                              el.className.includes('bg-slate-200') ? '#e2e8f0' : '#ffffff';
                 } else if (prop === 'color') {
                   fallback = el.className.includes('text-slate-900') || el.className.includes('text-slate-800') ? '#0f172a' :
+                             el.className.includes('text-indigo-700') ? '#4338ca' :
+                             el.className.includes('text-indigo-950') ? '#1e1b4b' :
                              el.className.includes('text-slate-500') || el.className.includes('text-slate-400') ? '#64748b' : '#0f172a';
+                } else if (prop.includes('border')) {
+                  fallback = el.className.includes('border-indigo-400') ? '#818cf8' : '#cbd5e1';
                 } else if (prop.includes('shadow')) {
                   fallback = 'none';
                 } else if (prop === 'background-image') {
@@ -322,7 +353,8 @@ export const CertificateGeneratorPage = () => {
     college: 'College ID',
     community: 'Community Certificate',
     tenth: '10th Marksheet',
-    twelfth: '12th Marksheet'
+    twelfth: '12th Marksheet',
+    disability: 'Disability Certificate'
   };
 
   return (
@@ -691,6 +723,93 @@ export const CertificateGeneratorPage = () => {
                     </div>
                   </>
                 )}
+
+                {/* --- DISABILITY CERTIFICATE FORM --- */}
+                {activeDocType === 'disability' && (
+                  <>
+                    <label className="text-xs font-semibold text-slate-500">Certificate Number</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.certificate_no}
+                      onChange={(e) => handleFieldChange('disability', 'certificate_no', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Full Name of Applicant</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.name}
+                      onChange={(e) => handleFieldChange('disability', 'name', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Father's / Guardian's Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.father_name}
+                      onChange={(e) => handleFieldChange('disability', 'father_name', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Date of Birth</label>
+                        <input
+                          type="date"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.disability.dob}
+                          onChange={(e) => handleFieldChange('disability', 'dob', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Gender</label>
+                        <select
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.disability.gender}
+                          onChange={(e) => handleFieldChange('disability', 'gender', e.target.value)}
+                        >
+                          <option value="MALE">MALE</option>
+                          <option value="FEMALE">FEMALE</option>
+                          <option value="OTHER">OTHER</option>
+                        </select>
+                      </div>
+                    </div>
+                    <label className="text-xs font-semibold text-slate-500">Disability Type / Category</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.disability_type}
+                      onChange={(e) => handleFieldChange('disability', 'disability_type', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Disability Percentage (%)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.percentage}
+                      onChange={(e) => handleFieldChange('disability', 'percentage', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Clinical Diagnosis</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.diagnosis}
+                      onChange={(e) => handleFieldChange('disability', 'diagnosis', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Issuing Hospital / Authority</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.issuing_hospital}
+                      onChange={(e) => handleFieldChange('disability', 'issuing_hospital', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Date of Issue</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.disability.date}
+                      onChange={(e) => handleFieldChange('disability', 'date', e.target.value)}
+                    />
+                  </>
+                )}
               </div>
 
               <div className="flex flex-col gap-2.5 mt-5">
@@ -1041,6 +1160,93 @@ export const CertificateGeneratorPage = () => {
 
                   <div className="text-[8px] text-slate-400 italic">
                     School: {fields.twelfth.school_name}
+                  </div>
+                </div>
+              )}
+
+              {/* --- DISABILITY CERTIFICATE TEMPLATE --- */}
+              {activeDocType === 'disability' && (
+                <div id="certificate-template" className="w-[560px] bg-white text-slate-900 border-2 border-slate-400 rounded-xl p-6 shadow-2xl font-serif relative select-none">
+                  {/* Header */}
+                  <div className="text-center border-b-2 border-slate-800 pb-3 mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className="w-8 h-8 rounded-full border-2 border-slate-800 flex items-center justify-center text-xs font-black bg-slate-100">
+                        🇮🇳
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 uppercase tracking-widest">Government of India / State Medical Board</div>
+                    <div className="text-base font-black text-slate-900 uppercase tracking-wider mt-0.5">CERTIFICATE OF DISABILITY</div>
+                    <div className="text-[9px] text-slate-500 italic mt-0.5">
+                      (Issued under Rights of Persons with Disabilities Rules, 2017 - Form V / UDID Format)
+                    </div>
+                  </div>
+
+                  {/* Cert No and Date bar */}
+                  <div className="flex justify-between items-center text-[10px] font-semibold text-slate-700 mb-4 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-sans">
+                    <div>Certificate No: <span className="font-mono font-bold text-slate-900">{fields.disability.certificate_no}</span></div>
+                    <div>Date of Issue: <span className="font-mono font-bold text-slate-900">{fields.disability.date}</span></div>
+                  </div>
+
+                  {/* Main Grid: Details + Beneficiary Photo */}
+                  <div className="grid grid-cols-12 gap-4 mb-3 font-sans">
+                    {/* Left: Photo box */}
+                    <div className="col-span-4 flex flex-col items-center gap-1.5">
+                      <div className="w-24 h-28 border-2 border-slate-400 bg-slate-50 rounded flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+                        <User className="w-12 h-12 text-slate-400" />
+                        <div className="absolute bottom-0 w-full bg-slate-800 text-[7px] text-white text-center py-0.5 uppercase font-bold">
+                          Attested Photo
+                        </div>
+                      </div>
+                      <div className="w-24 text-[8px] text-center text-slate-500 border border-dashed border-slate-300 rounded py-0.5">
+                        Medical Board Seal
+                      </div>
+                    </div>
+
+                    {/* Right: Personal & Clinical Info */}
+                    <div className="col-span-8 text-[11px] flex flex-col gap-1.5 leading-snug">
+                      <p>
+                        This is to certify that we have carefully examined <strong className="text-slate-900 uppercase underline">{fields.disability.name || 'APPLICANT NAME'}</strong>,
+                        Son / Daughter of <strong className="text-slate-900">{fields.disability.father_name}</strong>.
+                      </p>
+                      <div className="grid grid-cols-2 gap-1 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
+                        <div>DOB: <span className="font-bold">{fields.disability.dob}</span></div>
+                        <div>Gender: <span className="font-bold">{fields.disability.gender}</span></div>
+                      </div>
+                      <div className="mt-1">
+                        <span className="text-slate-500 text-[10px] block">Disability Classification:</span>
+                        <span className="font-bold text-slate-900">{fields.disability.disability_type}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-[10px] block">Diagnosis:</span>
+                        <span className="italic text-slate-800 text-[10px]">{fields.disability.diagnosis}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Prominent Disability Assessment Box */}
+                  <div className="my-3 p-3 bg-indigo-50 border-2 border-indigo-400 rounded-xl flex items-center justify-between text-indigo-950 font-sans">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Permanent Disability Assessment</div>
+                      <div className="text-xs font-bold mt-0.5">Condition: Permanent / Progressive: No</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-black text-indigo-700">{fields.disability.percentage}%</div>
+                      <div className="text-[8px] font-bold uppercase text-indigo-600">Benchmark Disability</div>
+                    </div>
+                  </div>
+
+                  {/* Issuing Authority & Signatures */}
+                  <div className="mt-4 pt-3 border-t border-slate-300 flex justify-between items-end text-[9px] text-slate-600 font-sans">
+                    <div className="max-w-[220px]">
+                      <span className="font-bold block text-slate-800">Issuing Authority:</span>
+                      <span>{fields.disability.issuing_hospital}</span>
+                    </div>
+                    <div className="text-center flex flex-col items-center">
+                      <div className="text-xs text-slate-800 italic mb-1 font-bold">Dr. R. Ramanathan</div>
+                      <div className="w-28 border-t border-slate-400"></div>
+                      <span className="font-bold text-slate-800">Chairperson / Specialist</span>
+                      <span className="text-[8px] text-slate-500">District Medical Board</span>
+                    </div>
                   </div>
                 </div>
               )}

@@ -245,3 +245,26 @@ class TranslationRequest(BaseModel):
 class TranslationResponse(BaseModel):
     translations: Dict[str, str]
     target_lang: str
+
+class DocumentCollectionStartRequest(BaseModel):
+    document_type: str
+    open_browser: Optional[bool] = True
+
+class HumanVerificationConfirmRequest(BaseModel):
+    document_type: str
+
+class DocumentCollectionStatusResponse(BaseModel):
+    user_id: int
+    document_type: str
+    state: str
+    official_url: str
+    status_message: str
+    portal_info: Optional[Dict[str, Any]] = None
+    search_term: Optional[str] = None
+    block_reason: Optional[str] = None
+    verification_reason: Optional[str] = None
+    document_page_url: Optional[str] = None
+    history: Optional[List[Dict[str, Any]]] = None
+    started_at: Optional[str] = None
+    updated_at: Optional[str] = None
+

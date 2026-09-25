@@ -34,7 +34,18 @@ class RequiredDocumentAgent:
         cat_str = str(scholarship.category or "").lower()
         if cat_str and not any(k in cat_str for k in ("all", "any", "general", "merit")):
             docs.append("community")
-        if "disability" in cat_str or "pwd" in cat_str:
-            docs.append("disability")
-
         return list(set(docs))
+
+    def get_official_portal(self, document_type: str) -> dict:
+        from .document_collector_agent import OFFICIAL_PORTAL_REGISTRY
+        doc_key = document_type.lower().strip()
+        return OFFICIAL_PORTAL_REGISTRY.get(doc_key, {
+            "document_type": doc_key,
+            "name": f"{doc_key.capitalize()} Certificate",
+            "authority": "National Digital Depository / DigiLocker",
+            "official_url": "https://www.digilocker.gov.in/",
+            "search_term": f"Download {doc_key.capitalize()} Certificate",
+            "requires_otp": False,
+            "description": "Official government document and credential portal."
+        })
+

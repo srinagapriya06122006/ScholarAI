@@ -6,6 +6,7 @@ import urllib.parse
 import ssl
 import re
 import time
+import random
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
@@ -61,6 +62,142 @@ class GoogleScholarshipVerificationAgent:
             logger.error(f"Serper API fallback error for query '{query}': {e}")
             return []
 
+    @staticmethod
+    def _is_captcha(page) -> bool:
+        """Check if Google returned a CAPTCHA / bot challenge page."""
+        try:
+            url = page.url.lower()
+            if "google.com/sorry" in url or "sorry/index" in url or "sorry" in url:
+                return True
+            title = page.title().lower()
+            if "sorry" in title or "unusual traffic" in title:
+                return True
+            if page.locator("iframe[src*='recaptcha'], iframe[title*='reCAPTCHA'], #captcha-form").count() > 0:
+                return True
+        except Exception:
+            pass
+        return False
+
+    def _handle_captcha_and_research(self, page, q_text: str, max_wait: int = 60) -> bool:
+        """
+        When Google serves a CAPTCHA (google.com/sorry):
+        1. Brings browser to front so user sees it.
+        2. Shows user an on-screen banner: click 'I am not a robot' and search will re-run automatically.
+        3. Attempts auto-click on the 'I am not a robot' checkbox.
+        4. Waits up to max_wait (60s) for the user to click / solve verification.
+        5. Once resolved, immediately re-runs the search for q_text.
+        """
+        if not self._is_captcha(page):
+            return False
+
+        logger.warning(
+            f"Google CAPTCHA encountered on query: '{q_text}'. "
+            f"Waiting up to {max_wait}s for user to click 'I am not a robot' / solve verification..."
+        )
+
+        try:
+            page.bring_to_front()
+        except Exception:
+            pass
+
+        # Inject visible on-screen guidance banner
+        try:
+            page.evaluate("""
+                (() => {
+                    if (document.getElementById('scholarai-captcha-notice')) return;
+                    const banner = document.createElement('div');
+                    banner.id = 'scholarai-captcha-notice';
+                    banner.style.position = 'fixed';
+                    banner.style.top = '14px';
+                    banner.style.left = '50%';
+                    banner.style.transform = 'translateX(-50%)';
+                    banner.style.backgroundColor = '#0f172a';
+                    banner.style.color = '#38bdf8';
+                    banner.style.border = '2px solid #0284c7';
+                    banner.style.padding = '12px 24px';
+                    banner.style.borderRadius = '12px';
+                    banner.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+                    banner.style.zIndex = '2147483647';
+                    banner.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+                    banner.style.fontSize = '14px';
+                    banner.style.fontWeight = 'bold';
+                    banner.style.textAlign = 'center';
+                    banner.innerHTML = '🤖 ScholarAI: Please click <b>\"I\\'m not a robot\"</b> below. The search will automatically re-run once verified!';
+                    document.body.appendChild(banner);
+                })()
+            """)
+        except Exception:
+            pass
+
+        # Attempt auto-click on reCAPTCHA checkbox
+        try:
+            for frame in page.frames:
+                if "recaptcha" in frame.url:
+                    cb = frame.locator("#recaptcha-anchor, .recaptcha-checkbox").first
+                    if cb.is_visible(timeout=1500):
+                        logger.info("Attempting auto-click on reCAPTCHA 'I am not a robot' checkbox...")
+                        cb.click()
+                        time.sleep(1.0)
+                        break
+        except Exception as e:
+            logger.debug(f"Auto-click attempt: {e}")
+
+        # Wait for user to solve CAPTCHA
+        start_wait = time.time()
+        while time.time() - start_wait < max_wait:
+            current_url = page.url.lower()
+            if "sorry" not in current_url:
+                logger.info(f"CAPTCHA solved! Page redirected to: {page.url}")
+                time.sleep(1.5)
+                break
+
+            # Check if reCAPTCHA checkbox is checked
+            try:
+                for frame in page.frames:
+                    if "recaptcha" in frame.url:
+                        checked_cb = frame.locator("#recaptcha-anchor[aria-checked='true'], .recaptcha-checkbox-checked").first
+                        if checked_cb.is_visible(timeout=400):
+                            logger.info("reCAPTCHA checkbox verified by user. Waiting for redirect...")
+                            time.sleep(2.0)
+                            if "sorry" not in page.url.lower():
+                                break
+            except Exception:
+                pass
+
+            time.sleep(1.0)
+
+        # Remove banner
+        try:
+            page.evaluate("document.getElementById('scholarai-captcha-notice')?.remove()")
+        except Exception:
+            pass
+
+        # SEARCH IT AGAIN!
+        logger.info(f"Executing search again after verification: '{q_text}'")
+        try:
+            # If already on search results page and has results, let it stay
+            if "google.com/search" in page.url.lower() and "sorry" not in page.url.lower():
+                results_exist = page.locator("div.g, div[data-sokoban-container], div.MjjYud, div.tF2Cxc").first.is_visible(timeout=2500)
+                if results_exist:
+                    logger.info("Search results already visible on page after redirect.")
+                    return True
+
+            # Otherwise re-run the search directly
+            encoded_q = urllib.parse.quote_plus(q_text)
+            page.goto(f"https://www.google.com/search?q={encoded_q}", wait_until="domcontentloaded", timeout=12000)
+            time.sleep(1.5)
+
+            if self._is_captcha(page):
+                logger.warning("Secondary challenge detected, waiting up to 30s...")
+                try:
+                    page.wait_for_url(lambda u: "sorry" not in u.lower(), timeout=30000)
+                except Exception:
+                    pass
+            return True
+        except Exception as res_err:
+            logger.warning(f"Error during re-search: {res_err}")
+            return False
+
     def run_browser_rpa_searches(self, queries: List[Dict[str, str]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
         Visibly opens Google Chrome using Playwright, navigates to Google,
@@ -79,15 +216,43 @@ class GoogleScholarshipVerificationAgent:
                 try:
                     browser = p.chromium.launch(
                         headless=False,
-                        args=["--start-maximized", "--disable-blink-features=AutomationControlled"]
+                        channel="chrome",
+                        args=[
+                            "--start-maximized",
+                            "--disable-blink-features=AutomationControlled",
+                            "--no-sandbox"
+                        ]
                     )
                 except Exception:
-                    browser = p.chromium.launch(headless=False)
+                    browser = p.chromium.launch(
+                        headless=False,
+                        args=[
+                            "--start-maximized",
+                            "--disable-blink-features=AutomationControlled"
+                        ]
+                    )
 
                 context = browser.new_context(
                     no_viewport=True,
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+                    locale="en-US",
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    extra_http_headers={
+                        "Accept-Language": "en-US,en;q=0.9",
+                    }
                 )
+                # Stealth injection: hide navigator.webdriver flag so Google does not flag as robot
+                context.add_init_script("""
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    window.chrome = window.chrome || { runtime: {} };
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5]
+                    });
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['en-US', 'en']
+                    });
+                """)
                 page = context.new_page()
 
                 for idx, q_item in enumerate(queries, 1):
@@ -98,37 +263,55 @@ class GoogleScholarshipVerificationAgent:
                     try:
                         # 1. Navigate to Google
                         page.goto("https://www.google.com", wait_until="domcontentloaded", timeout=10000)
-                        time.sleep(0.6)
+                        time.sleep(0.8)
+
+                        # Check if Google served bot challenge immediately
+                        if self._is_captcha(page):
+                            self._handle_captcha_and_research(page, q_text, max_wait=60)
 
                         # 2. Find search box and type the query with realistic typing animation
-                        search_box = page.locator("textarea[name='q'], input[name='q']").first
-                        if search_box.is_visible(timeout=3000):
-                            search_box.click()
-                            search_box.fill("")
-                            try:
-                                search_box.press_sequentially(q_text, delay=15)
-                            except Exception:
-                                search_box.fill(q_text)
-                            time.sleep(0.4)
-                            search_box.press("Enter")
-                            page.wait_for_load_state("domcontentloaded", timeout=8000)
-                            time.sleep(1.2)
+                        if "google.com/search" not in page.url.lower() or self._is_captcha(page):
+                            search_box = page.locator("textarea[name='q'], input[name='q']").first
+                            if search_box.is_visible(timeout=3000):
+                                search_box.click()
+                                search_box.fill("")
+                                try:
+                                    search_box.press_sequentially(q_text, delay=random.randint(25, 50))
+                                except Exception:
+                                    search_box.fill(q_text)
+                                time.sleep(0.5)
+                                search_box.press("Enter")
+                                try:
+                                    page.wait_for_load_state("domcontentloaded", timeout=8000)
+                                except Exception:
+                                    pass
+                                time.sleep(1.2)
+                            else:
+                                # Direct query fallback if search box wasn't located directly
+                                encoded_q = urllib.parse.quote_plus(q_text)
+                                page.goto(f"https://www.google.com/search?q={encoded_q}", wait_until="domcontentloaded", timeout=8000)
+                                time.sleep(1.0)
 
-                            # Smooth scroll down so the user can visibly see search results
-                            try:
-                                page.evaluate("window.scrollBy({top: 350, behavior: 'smooth'})")
-                            except Exception:
-                                pass
-                            time.sleep(1.0)
+                        # Check if Google served bot challenge AFTER submitting query
+                        # (e.g. redirected to google.com/sorry with 'I am not a robot')
+                        if self._is_captcha(page):
+                            self._handle_captcha_and_research(page, q_text, max_wait=60)
+
+                        # Smooth scroll down so the user can visibly see search results
+                        try:
+                            page.evaluate("window.scrollBy({top: 350, behavior: 'smooth'})")
+                        except Exception:
+                            pass
+                        time.sleep(1.0)
 
                         # 3. Extract search results from SERP
                         results = []
-                        elements = page.locator("div.g, div[data-sokoban-container], div.MjjYud").all()
+                        elements = page.locator("div.g, div[data-sokoban-container], div.MjjYud, div.tF2Cxc").all()
                         for el in elements[:6]:
                             try:
-                                title_el = el.locator("h3").first
+                                title_el = el.locator("h3, div[role='heading']").first
                                 link_el = el.locator("a").first
-                                snippet_el = el.locator("div.VwiC3b, div[data-sncf='1'], div[style*='-webkit-line-clamp']").first
+                                snippet_el = el.locator("div.VwiC3b, div[data-sncf='1'], div[style*='-webkit-line-clamp'], span.aCOpRe").first
                                 
                                 title = title_el.inner_text() if title_el.is_visible() else ""
                                 link = link_el.get_attribute("href") if link_el.is_visible() else ""

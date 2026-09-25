@@ -255,7 +255,7 @@ class VerificationAgent:
         reasons = []
 
         # 1. Verify Name (required for identity documents)
-        if doc.document_type in ("aadhaar", "college", "tenth", "twelfth"):
+        if doc.document_type in ("aadhaar", "college", "tenth", "twelfth", "disability"):
             ocr_name = extracted_data.get("name")
             if ocr_name:
                 if not self._names_match(user.fullName, ocr_name):
@@ -386,6 +386,17 @@ class VerificationAgent:
                     "reason": "Percentage details not found or calculated from marksheet"
                 }
                 reasons.append("Percentage details not found or calculated from marksheet")
+ 
+        elif doc_type == "disability":
+            ocr_gender = extracted_data.get("gender")
+            if ocr_gender and profile and profile.gender:
+                if self._normalize_gender(ocr_gender) != self._normalize_gender(profile.gender):
+                    mismatch_fields["gender"] = {
+                        "profile": profile.gender,
+                        "ocr": ocr_gender,
+                        "reason": f"Gender mismatch: Entered '{profile.gender}', Document says '{ocr_gender}'"
+                    }
+                    reasons.append(f"Gender mismatch: Entered '{profile.gender}', Document says '{ocr_gender}'")
 
         # 3. Document classification mismatch check
         classification_warning = extracted_data.get("classification_warning")

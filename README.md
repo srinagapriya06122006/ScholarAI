@@ -39,8 +39,8 @@
 
 1. **Intelligent Multi-Agent Orchestration**:
    - 8 specialized autonomous agents coordinated by a centralized **Supervisor Agent** executing profile validation, OCR extraction, fraud/mismatch detection, 16-parameter scholarship matching, online RPA verification, and conversational RAG.
-2. **Visible Google RPA Online Verification Engine**:
-   - Uses Playwright to launch a live, visible Google Chrome window on the user's desktop (`headless=False`), sequentially typing dynamic questions tailored to the scholarship's criteria (CGPA, Course, Income limit, Category, Domicile, and Portal Deadlines), scrolling results, extracting live web snippets, and corroborating against MySQL database records with audit logging into `Scholarship_Verification.xlsx`.
+2. **Visible Google RPA Online Verification Engine & Interactive CAPTCHA Resolution**:
+   - Uses Playwright to launch a live, visible Google Chrome window on the user's desktop (`headless=False`), sequentially typing dynamic questions tailored to scholarship criteria, handling bot challenges (`google.com/sorry`) with interactive "Click Then Search Again" resolution, scrolling results, extracting live web snippets, and corroborating against MySQL database records with audit logging into `Scholarship_Verification.xlsx`.
 3. **Strict 16-Parameter Eligibility Engine**:
    - Evaluates CGPA, 10th/12th percentages, family income ceiling, category/caste, native state, degree, department, first-generation graduate status, sports quota, NCC, NSS, disability, minority status, and active arrears history.
 4. **Automated Document OCR & Fuzzy Cross-Auditing**:
@@ -274,16 +274,26 @@ newbeg/
 ## 🌐 Visible Google RPA Online Verification Engine
 
 When the student clicks **"Verify on Google"** on any scholarship card:
-1. **Desktop Chrome Launch**: Playwright launches Chromium visibly on the desktop with `--start-maximized`.
+1. **Desktop Chrome Launch & Anti-Detection Hardening**:
+   - Playwright launches Google Chrome visibly on the desktop with `--start-maximized`, `--disable-blink-features=AutomationControlled`, and `--no-sandbox`.
+   - Injects stealth scripts overriding `navigator.webdriver`, mocking `window.chrome.runtime`, and spoofing realistic browser plugins and languages (`en-US`).
 2. **Requirements-Driven Dynamic Searches**:
    - **Query 1 (Identity & Portal)**: `"[Scholarship Name]" [Provider] eligibility criteria official application 2026`
-   - **Query 2 (Academic Merit)**: `"[Scholarship Name]" minimum CGPA [Value] eligibility 2026`
-   - **Query 3 (Course & Quota)**: `"[Scholarship Name]" [Degree] [Department] [Category] criteria`
-   - **Query 4 (Financial Limit)**: `"[Scholarship Name]" annual family income below ₹[Value] income certificate`
-   - **Query 5 (Official Deadline)**: `"[Scholarship Name]" application last date deadline status site:scholarships.gov.in OR site:buddy4study.com`
-3. **Realistic Human Automation**: Types queries with character key delays (`delay=15ms`), presses Enter, scrolls the search results, and captures domain links.
-4. **Corroboration Matrix**: Compares MySQL database parameters against online extracted criteria and returns compatibility statuses (`PASS`, `FLAG`, `ACTIVE`).
-5. **Excel Audit Logging**: Writes every query, source URL, and timestamp into `backend/Scholarship_Verification.xlsx`.
+   - **Query 2 (Academic Merit & Income)**: `"[Scholarship Name]" minimum CGPA [Value] annual income below [Value] eligibility 2026`
+   - **Query 3 (Course, Community & Domicile)**: `"[Scholarship Name]" [Category] [State] domicile criteria 2026`
+   - **Query 4 (Official Portal Deadline & Status)**: `"[Scholarship Name]" application last date deadline status site:scholarships.gov.in OR site:buddy4study.com`
+3. **Realistic Human Automation & Natural Typing**:
+   - Types queries using natural keystroke delays (`delay = random.randint(25, 50)ms`), submits search, and smoothly scrolls to reveal live search results.
+4. **Interactive CAPTCHA Resolution & Auto Re-Search ("Click Then Search Again")**:
+   - **Challenge Detection**: Automatically detects Google bot challenge pages (`google.com/sorry` or reCAPTCHA prompts).
+   - **Foreground Window Focus**: Brings the Chrome browser window directly to the front (`page.bring_to_front()`) so the user can immediately interact.
+   - **Visual Guidance Banner**: Displays a floating banner at the top of the browser informing the user: *"ScholarAI: Please click 'I'm not a robot' below. The search will automatically re-run once verified!"*.
+   - **Auto-Click Attempt**: Attempts an initial programmatic click on the reCAPTCHA anchor checkbox.
+   - **User Resolution Window**: Pauses automation and polls for up to 60 seconds allowing the student to complete image challenges or check the box.
+   - **Automatic Re-Search**: Once verification is confirmed (`aria-checked="true"` or redirection away from `sorry`), the agent **immediately re-executes the search query**, smoothly scrolls, and extracts organic SERP elements (`div.g`, `div.MjjYud`, `div.tF2Cxc`).
+   - **Extended Modal Timeout**: Frontend verification modal timeout expanded to 120s to ensure ample time for interactive verification without premature fallback.
+5. **Corroboration Matrix**: Compares MySQL database parameters against online extracted criteria and returns compatibility statuses (`PASS`, `FLAG`, `ACTIVE`).
+6. **Excel Audit Logging**: Writes every query, source URL, and timestamp into `backend/Scholarship_Verification.xlsx`.
 
 ---
 
