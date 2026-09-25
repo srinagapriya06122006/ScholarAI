@@ -255,44 +255,98 @@ def send_application_submitted_email(
     application_id: int,
     submitted_at: str = None
 ) -> dict:
-    """Send confirmation email when student submits an application."""
-    subject = "Scholarship Application Submitted"
-    preheader = f"Application #{application_id} for {scholarship_name} has been received."
+    """Send confirmation email when student submits an application with tracking timeline."""
+    subject = f"Scholarship Application Submitted — #{application_id}"
+    preheader = f"Application #{application_id} for {scholarship_name} has been received. Track reference: SCH-TRK-{application_id:04d}."
     sub_date = submitted_at or datetime.now().strftime("%B %d, %Y at %I:%M %p")
     track_url = f"{get_frontend_url()}/dashboard/applications?id={application_id}"
+    tracking_code = f"SCH-TRK-{application_id:04d}"
 
     body_html = f"""
       <div style="text-align: center; margin-bottom: 20px;">
         <span class="badge badge-blue">Application Submitted</span>
         <h2 style="margin: 12px 0 4px 0; color: #0f172a; font-size: 18px;">Application Successfully Received</h2>
-        <p style="margin: 0; font-size: 14px; color: #475569;">Hello <strong>{student_name}</strong>, your application has been received and forwarded to college administration for verification.</p>
+        <p style="margin: 0; font-size: 14px; color: #475569;">Hello <strong>{student_name}</strong>, your application has been received and registered in the scholarship pipeline.</p>
       </div>
 
-      <div class="info-box">
+      <!-- Application Tracking Details Card -->
+      <div class="info-box" style="border-left: 4px solid #4f46e5;">
+        <div style="font-size: 11px; font-weight: 800; color: #4f46e5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+          📍 Application Tracking Details
+        </div>
+        <div class="info-row">
+          <span class="info-label">Tracking Number:</span>
+          <span class="info-val" style="font-family: monospace; color: #4338ca; font-weight: 800;">{tracking_code}</span>
+        </div>
         <div class="info-row">
           <span class="info-label">Application ID:</span>
           <span class="info-val">#{application_id}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Scholarship:</span>
+          <span class="info-label">Scholarship Scheme:</span>
           <span class="info-val">{scholarship_name}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Submitted On:</span>
+          <span class="info-label">Submission Date:</span>
           <span class="info-val">{sub_date}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Status:</span>
-          <span class="info-val" style="color: #4338ca;">SUBMITTED (Pending Admin Review)</span>
+          <span class="info-label">Current Status:</span>
+          <span class="info-val" style="color: #4338ca; font-weight: 700;">SUBMITTED (Pending Verification)</span>
         </div>
       </div>
 
-      <p style="font-size: 13px; color: #475569; line-height: 1.6;">
-        Your supporting documents have been attached to your application. The administration committee will verify your details and eligibility. You can track real-time progress on your student portal.
-      </p>
+      <!-- Live Tracking Progress Timeline -->
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
+          🚦 Live Progress Timeline
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="width: 26px; vertical-align: top; padding-bottom: 12px;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #22c55e; color: #ffffff; text-align: center; line-height: 20px; font-size: 11px; font-weight: bold;">✓</div>
+            </td>
+            <td style="vertical-align: top; padding-bottom: 12px;">
+              <strong style="font-size: 13px; color: #0f172a; display: block;">Step 1: Application Registered</strong>
+              <span style="font-size: 11px; color: #64748b;">Profile and eligibility data submitted</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 26px; vertical-align: top; padding-bottom: 12px;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #3b82f6; color: #ffffff; text-align: center; line-height: 20px; font-size: 10px; font-weight: bold;">⏳</div>
+            </td>
+            <td style="vertical-align: top; padding-bottom: 12px;">
+              <strong style="font-size: 13px; color: #1e40af; display: block;">Step 2: AI Document &amp; OCR Verification</strong>
+              <span style="font-size: 11px; color: #64748b;">Cross-auditing certificates against profile credentials</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 26px; vertical-align: top; padding-bottom: 12px;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #e2e8f0; color: #94a3b8; text-align: center; line-height: 20px; font-size: 10px; font-weight: bold;">3</div>
+            </td>
+            <td style="vertical-align: top; padding-bottom: 12px;">
+              <strong style="font-size: 13px; color: #64748b; display: block;">Step 3: Administration Committee Review</strong>
+              <span style="font-size: 11px; color: #94a3b8;">Pending committee approval</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 26px; vertical-align: top;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #e2e8f0; color: #94a3b8; text-align: center; line-height: 20px; font-size: 10px; font-weight: bold;">4</div>
+            </td>
+            <td style="vertical-align: top;">
+              <strong style="font-size: 13px; color: #64748b; display: block;">Step 4: Grant Disbursement</strong>
+              <span style="font-size: 11px; color: #94a3b8;">Direct Benefit Transfer scheduled post-approval</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px 14px; margin: 16px 0; font-size: 12px; color: #475569;">
+        💡 <strong>Tracking Tip:</strong> You can monitor real-time committee review, download audit receipts, or respond to clarification requests using the tracking link below.
+      </div>
 
       <div style="text-align: center; margin-top: 24px;">
-        <a href="{track_url}" class="btn">Track Application Status</a>
+        <a href="{track_url}" class="btn" style="background-color: #4f46e5;">Track Application Live Status ↗</a>
       </div>
     """
     return _send_brevo_email(student_email, subject, _base_email_template(subject, preheader, body_html), student_name=student_name)
@@ -307,21 +361,31 @@ def send_application_approved_email(
     grant_amount: str = None,
     admin_notes: str = None
 ) -> dict:
-    """Send congratulations email when administrator approves an application."""
-    subject = "Scholarship Application Approved"
-    preheader = f"Congratulations! Your application #{application_id} for {scholarship_name} has been APPROVED."
+    """Send congratulations email with complete application tracking details when administrator approves an application."""
+    subject = f"Congratulations! Scholarship Application Approved — #{application_id}"
+    preheader = f"Congratulations! Your application #{application_id} for {scholarship_name} has been officially APPROVED."
     amt_text = grant_amount or "Standard Grant"
     remarks = admin_notes or "Application approved by scholarship administration committee after document verification."
     track_url = f"{get_frontend_url()}/dashboard/applications?id={application_id}"
+    tracking_code = f"SCH-TRK-{application_id:04d}"
+    approval_date = datetime.now().strftime("%B %d, %Y at %I:%M %p")
 
     body_html = f"""
       <div style="text-align: center; margin-bottom: 20px;">
-        <span class="badge badge-green">Approved ✔</span>
+        <span class="badge badge-green">Approved &amp; Verified ✔</span>
         <h2 style="margin: 12px 0 4px 0; color: #15803d; font-size: 20px;">Congratulations {student_name}!</h2>
-        <p style="margin: 0; font-size: 14px; color: #475569;">Your scholarship application has been officially <strong>APPROVED</strong>.</p>
+        <p style="margin: 0; font-size: 14px; color: #475569;">Your scholarship application has been officially <strong>APPROVED</strong> by the institutional administration committee.</p>
       </div>
 
-      <div class="info-box">
+      <!-- Application Tracking Details Card -->
+      <div class="info-box" style="border-left: 4px solid #16a34a;">
+        <div style="font-size: 11px; font-weight: 800; color: #16a34a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+          📍 Official Application Tracking Details
+        </div>
+        <div class="info-row">
+          <span class="info-label">Tracking Number:</span>
+          <span class="info-val" style="font-family: monospace; color: #15803d; font-weight: 800;">{tracking_code}</span>
+        </div>
         <div class="info-row">
           <span class="info-label">Application ID:</span>
           <span class="info-val">#{application_id}</span>
@@ -331,22 +395,82 @@ def send_application_approved_email(
           <span class="info-val">{scholarship_name}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Grant Amount:</span>
-          <span class="info-val" style="color: #15803d;">{amt_text}</span>
+          <span class="info-label">Approved Grant Amount:</span>
+          <span class="info-val" style="color: #15803d; font-size: 15px; font-weight: 800;">{amt_text}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Final Decision:</span>
-          <span class="info-val" style="color: #15803d;">Approved</span>
+          <span class="info-label">Approval Decision:</span>
+          <span class="info-val" style="color: #15803d; font-weight: 800;">APPROVED &amp; VERIFIED</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Approval Date:</span>
+          <span class="info-val">{approval_date}</span>
         </div>
       </div>
 
+      <!-- Committee Remarks -->
       <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 12px 16px; border-radius: 8px; margin: 16px 0;">
-        <strong style="font-size: 12px; color: #15803d; text-transform: uppercase; display: block; margin-bottom: 4px;">Admin Remarks:</strong>
-        <p style="margin: 0; font-size: 13px; color: #166534;">{remarks}</p>
+        <strong style="font-size: 11px; color: #15803d; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px;">Committee Verification Remarks:</strong>
+        <p style="margin: 0; font-size: 13px; color: #166534; line-height: 1.5;">{remarks}</p>
+      </div>
+
+      <!-- Live Tracking Progress Timeline -->
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
+          🚦 Application Lifecycle &amp; Milestone Timeline
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="width: 26px; vertical-align: top; padding-bottom: 12px;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #22c55e; color: #ffffff; text-align: center; line-height: 20px; font-size: 11px; font-weight: bold;">✓</div>
+            </td>
+            <td style="vertical-align: top; padding-bottom: 12px;">
+              <strong style="font-size: 13px; color: #0f172a; display: block;">Step 1: Application Submitted</strong>
+              <span style="font-size: 11px; color: #64748b;">Profile criteria and application package recorded</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 26px; vertical-align: top; padding-bottom: 12px;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #22c55e; color: #ffffff; text-align: center; line-height: 20px; font-size: 11px; font-weight: bold;">✓</div>
+            </td>
+            <td style="vertical-align: top; padding-bottom: 12px;">
+              <strong style="font-size: 13px; color: #0f172a; display: block;">Step 2: AI Document &amp; OCR Audit</strong>
+              <span style="font-size: 11px; color: #64748b;">Certificates (Income, Community, Marksheets) verified</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 26px; vertical-align: top; padding-bottom: 12px;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #22c55e; color: #ffffff; text-align: center; line-height: 20px; font-size: 11px; font-weight: bold;">✓</div>
+            </td>
+            <td style="vertical-align: top; padding-bottom: 12px;">
+              <strong style="font-size: 13px; color: #15803d; display: block;">Step 3: Committee Evaluation &amp; Approval</strong>
+              <span style="font-size: 11px; color: #15803d; font-weight: 600;">Officially Cleared &amp; Approved</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 26px; vertical-align: top;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #3b82f6; color: #ffffff; text-align: center; line-height: 20px; font-size: 10px; font-weight: bold;">⏳</div>
+            </td>
+            <td style="vertical-align: top;">
+              <strong style="font-size: 13px; color: #1e40af; display: block;">Step 4: Grant Disbursement &amp; Credit</strong>
+              <span style="font-size: 11px; color: #64748b;">In Process — Expected within 7–10 working days directly to student account</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Next Steps Box -->
+      <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; padding: 14px 16px; margin: 16px 0; font-size: 12px; color: #475569; line-height: 1.5;">
+        <strong>📌 What happens next?</strong>
+        <ul style="margin: 6px 0 0 0; padding-left: 18px;">
+          <li>Your tracking reference is <strong>{tracking_code}</strong>. Save this email for your records.</li>
+          <li>Ensure your Aadhaar-linked bank account is active to receive the grant amount ({amt_text}) without delay.</li>
+          <li>Click the button below to track live disbursement updates or download your official approval letter.</li>
+        </ul>
       </div>
 
       <div style="text-align: center; margin-top: 24px;">
-        <a href="{track_url}" class="btn" style="background-color: #16a34a;">View Approved Application</a>
+        <a href="{track_url}" class="btn" style="background-color: #16a34a;">Track Application Live Status ↗</a>
       </div>
     """
     return _send_brevo_email(student_email, subject, _base_email_template(subject, preheader, body_html), student_name=student_name)
@@ -360,11 +484,12 @@ def send_application_rejected_email(
     application_id: int,
     rejection_reason: str
 ) -> dict:
-    """Send formal decision notification when administrator rejects an application."""
-    subject = "Scholarship Application Rejected"
-    preheader = f"Update regarding application #{application_id} for {scholarship_name}."
+    """Send formal decision notification when administrator rejects an application with tracking reference."""
+    subject = f"Scholarship Application Status Update — #{application_id}"
+    preheader = f"Update regarding application #{application_id} for {scholarship_name}. Tracking reference: SCH-TRK-{application_id:04d}."
     reason_text = rejection_reason or "Does not meet specific eligibility or documentation criteria."
     track_url = f"{get_frontend_url()}/dashboard/applications?id={application_id}"
+    tracking_code = f"SCH-TRK-{application_id:04d}"
 
     body_html = f"""
       <div style="text-align: center; margin-bottom: 20px;">
@@ -373,7 +498,15 @@ def send_application_rejected_email(
         <p style="margin: 0; font-size: 14px; color: #475569;">Dear {student_name}, thank you for your application.</p>
       </div>
 
-      <div class="info-box">
+      <!-- Application Tracking Details Card -->
+      <div class="info-box" style="border-left: 4px solid #ef4444;">
+        <div style="font-size: 11px; font-weight: 800; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+          📍 Application Tracking Details
+        </div>
+        <div class="info-row">
+          <span class="info-label">Tracking Number:</span>
+          <span class="info-val" style="font-family: monospace; color: #991b1b; font-weight: 800;">{tracking_code}</span>
+        </div>
         <div class="info-row">
           <span class="info-label">Application ID:</span>
           <span class="info-val">#{application_id}</span>
@@ -383,22 +516,22 @@ def send_application_rejected_email(
           <span class="info-val">{scholarship_name}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Status:</span>
-          <span class="info-val" style="color: #b91c1c;">Rejected</span>
+          <span class="info-label">Final Decision:</span>
+          <span class="info-val" style="color: #b91c1c; font-weight: 700;">Declined / Not Approved</span>
         </div>
       </div>
 
       <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 8px; margin: 16px 0;">
-        <strong style="font-size: 12px; color: #b91c1c; text-transform: uppercase; display: block; margin-bottom: 4px;">Reason for Rejection:</strong>
-        <p style="margin: 0; font-size: 13px; color: #991b1b;">{reason_text}</p>
+        <strong style="font-size: 11px; color: #b91c1c; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px;">Reason for Committee Decision:</strong>
+        <p style="margin: 0; font-size: 13px; color: #991b1b; line-height: 1.5;">{reason_text}</p>
       </div>
 
       <p style="font-size: 13px; color: #475569; line-height: 1.6;">
-        You can explore other suitable scholarships matching your academic and financial criteria on the scholarship discovery portal.
+        You can explore other suitable scholarships matching your academic and financial criteria on your ScholarAI discovery portal.
       </p>
 
       <div style="text-align: center; margin-top: 24px;">
-        <a href="{track_url}" class="btn">View Application Details</a>
+        <a href="{track_url}" class="btn" style="background-color: #64748b;">View Application Tracking Details ↗</a>
       </div>
     """
     return _send_brevo_email(student_email, subject, _base_email_template(subject, preheader, body_html), student_name=student_name)
@@ -412,11 +545,12 @@ def send_application_review_email(
     application_id: int,
     admin_notes: str = None
 ) -> dict:
-    """Send notification when administrator marks an application Under Review."""
-    subject = "Scholarship Application Under Review"
-    preheader = f"Application #{application_id} for {scholarship_name} is currently under verification."
+    """Send notification when administrator marks an application Under Review with tracking details."""
+    subject = f"Scholarship Application Under Review — #{application_id}"
+    preheader = f"Application #{application_id} for {scholarship_name} is currently under verification. Tracking ref: SCH-TRK-{application_id:04d}."
     notes = admin_notes or "Your application and certificates are currently being reviewed by the administration committee."
     track_url = f"{get_frontend_url()}/dashboard/applications?id={application_id}"
+    tracking_code = f"SCH-TRK-{application_id:04d}"
 
     body_html = f"""
       <div style="text-align: center; margin-bottom: 20px;">
@@ -425,29 +559,39 @@ def send_application_review_email(
         <p style="margin: 0; font-size: 14px; color: #475569;">Hello {student_name}, your scholarship application is actively being verified.</p>
       </div>
 
-      <div class="info-box">
+      <!-- Application Tracking Details Card -->
+      <div class="info-box" style="border-left: 4px solid #7c3aed;">
+        <div style="font-size: 11px; font-weight: 800; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+          📍 Application Tracking Details
+        </div>
+        <div class="info-row">
+          <span class="info-label">Tracking Number:</span>
+          <span class="info-val" style="font-family: monospace; color: #6d28d9; font-weight: 800;">{tracking_code}</span>
+        </div>
         <div class="info-row">
           <span class="info-label">Application ID:</span>
           <span class="info-val">#{application_id}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Scholarship:</span>
+          <span class="info-label">Scholarship Scheme:</span>
           <span class="info-val">{scholarship_name}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Current Stage:</span>
-          <span class="info-val" style="color: #6d28d9;">Under Review</span>
+          <span class="info-val" style="color: #6d28d9; font-weight: 700;">Under Review (In Verification)</span>
         </div>
       </div>
 
       <div style="background-color: #faf5ff; border-left: 4px solid #a855f7; padding: 12px 16px; border-radius: 8px; margin: 16px 0;">
-        <strong style="font-size: 12px; color: #6d28d9; text-transform: uppercase; display: block; margin-bottom: 4px;">Review Notes:</strong>
-        <p style="margin: 0; font-size: 13px; color: #581c87;">{notes}</p>
+        <strong style="font-size: 11px; color: #6d28d9; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px;">Review Notes:</strong>
+        <p style="margin: 0; font-size: 13px; color: #581c87; line-height: 1.5;">{notes}</p>
       </div>
 
       <div style="text-align: center; margin-top: 24px;">
-        <a href="{track_url}" class="btn" style="background-color: #7c3aed;">Track Progress</a>
+        <a href="{track_url}" class="btn" style="background-color: #7c3aed;">Track Live Application Progress ↗</a>
       </div>
+    """
+    return _send_brevo_email(student_email, subject, _base_email_template(subject, preheader, body_html), student_name=student_name)
     """
     return _send_brevo_email(student_email, subject, _base_email_template(subject, preheader, body_html), student_name=student_name)
 
