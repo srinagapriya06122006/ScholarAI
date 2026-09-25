@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   X,
@@ -20,12 +20,37 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 
+const cleanEvidenceText = (text) => {
+  if (!text) return 'Official Portal Guidelines';
+  let cleaned = String(text).replace(/\s*\((?:https?:\/\/)?[\w.-]+(?:\.[\w.-]+)+[^\)]*\)/gi, '').trim();
+  cleaned = cleaned.replace(/\s*\(\s*$/, '').trim();
+  return cleaned || 'Official Portal Guidelines';
+};
+
+const getSourceUrl = (row, schUrl) => {
+  let url = row?.source_url || schUrl || 'https://scholarships.gov.in';
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+  return url;
+};
+
+const getDomainName = (url) => {
+  try {
+    const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+    return parsed.hostname.replace(/^www\./, '');
+  } catch (e) {
+    return 'scholarships.gov.in';
+  }
+};
+
 export default function AdaptiveRpaVerificationModal({ scholarship, studentProfile, isSubmitted, onClose, onSelect }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [verificationData, setVerificationData] = useState(null);
+  const verificationStarted = useRef(false);
 
   const schId = scholarship?.id || scholarship?.s_no || 1;
   const schName = scholarship?.scholarship_name || 'Scholarship Program';
@@ -99,12 +124,12 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
             { search_number: 3, label: "DEADLINE & STATUS SEARCH", query: `"${schName}" application deadline status 2025 2026`, results_count: 6 }
           ],
           comparison_matrix: [
-            { requirement: "Annual Family Income", mysql_database: db_inc, google_extracted: db_inc !== 'Not specified' ? `≤ ₹${db_inc}` : 'Standard Income Norms', status: "VERIFIED", evidence: `Official Portal (${db_link})`, source_url: db_link },
-            { requirement: "Academic Merit / CGPA", mysql_database: db_cgpa, google_extracted: db_cgpa !== 'Not specified' ? `Min ${db_cgpa}` : 'Merit-based qualification', status: "VERIFIED", evidence: `Guidelines (${db_link})`, source_url: db_link },
-            { requirement: "Course / Degree Level", mysql_database: db_deg, google_extracted: db_deg, status: "VERIFIED", evidence: "Official Portal", source_url: db_link },
-            { requirement: "Gender Eligibility", mysql_database: db_gen, google_extracted: db_gen, status: "VERIFIED", evidence: "Government Norms", source_url: db_link },
-            { requirement: "Application Deadline", mysql_database: db_dl, google_extracted: db_dl, status: "VERIFIED", evidence: "Official Portal Active Notification", source_url: db_link },
-            { requirement: "Current Scheme Status", mysql_database: "Active", google_extracted: "Active", status: "VERIFIED", evidence: "Verified Live on National Portal", source_url: db_link }
+            { requirement: "Annual Family Income", mysql_database: db_inc, google_extracted: db_inc !== 'Not specified' ? `≤ ₹${db_inc}` : 'Standard Income Norms', status: "VERIFIED", evidence: 'Official Income Guidelines', source_url: db_link },
+            { requirement: "Academic Merit / CGPA", mysql_database: db_cgpa, google_extracted: db_cgpa !== 'Not specified' ? `Min ${db_cgpa}` : 'Merit-based qualification', status: "VERIFIED", evidence: 'Academic Cutoff Guidelines', source_url: db_link },
+            { requirement: "Course / Degree Level", mysql_database: db_deg, google_extracted: db_deg, status: "VERIFIED", evidence: 'Degree Level Criteria', source_url: db_link },
+            { requirement: "Gender Eligibility", mysql_database: db_gen, google_extracted: db_gen, status: "VERIFIED", evidence: 'Government Reservation Norms', source_url: db_link },
+            { requirement: "Application Deadline", mysql_database: db_dl, google_extracted: db_dl, status: "VERIFIED", evidence: 'Portal Active Notification', source_url: db_link },
+            { requirement: "Current Scheme Status", mysql_database: "Active", google_extracted: "Active", status: "VERIFIED", evidence: 'Verified Live Scheme Status', source_url: db_link }
           ],
           eligibility_checks: [
             { parameter: "Family Income", student_value: studentProfile?.annualIncome ? `₹${studentProfile.annualIncome}` : "Eligible", rule: `≤ ₹${db_inc}`, status: "ELIGIBLE" },
@@ -124,6 +149,8 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
   };
 
   useEffect(() => {
+    if (verificationStarted.current) return;
+    verificationStarted.current = true;
     runVerification();
   }, [schId]);
 
@@ -357,19 +384,31 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
                               {row.status} {row.status === 'VERIFIED' ? '✓' : (row.status === 'MISMATCH' ? '✗' : '⚠')}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 font-sans text-[11px] text-slate-300 max-w-[180px] truncate">
-                            {row.source_url ? (
-                              <a
-                                href={row.source_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-sky-400 hover:underline flex items-center gap-1 line-clamp-1"
-                              >
-                                {row.evidence} <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                              </a>
-                            ) : (
-                              row.evidence
-                            )}
+                          <td className="py-2.5 px-3 font-sans text-xs min-w-[200px]">
+                            {(() => {
+                              const rawEvidence = row.evidence || 'Official Portal Guidelines';
+                              const evidenceLabel = cleanEvidenceText(rawEvidence);
+                              const sourceLink = getSourceUrl(row, scholarship?.official_url);
+                              const domain = getDomainName(sourceLink);
+
+                              return (
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className="text-slate-200 font-medium text-[11px] leading-tight" title={rawEvidence}>
+                                    {evidenceLabel}
+                                  </span>
+                                  <a
+                                    href={sourceLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 border border-sky-500/25 transition-all shadow-sm"
+                                    title={`Visit verified source: ${sourceLink}`}
+                                  >
+                                    <span>{domain}</span>
+                                    <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                                  </a>
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       ))}

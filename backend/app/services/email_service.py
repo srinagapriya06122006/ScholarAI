@@ -592,8 +592,6 @@ def send_application_review_email(
       </div>
     """
     return _send_brevo_email(student_email, subject, _base_email_template(subject, preheader, body_html), student_name=student_name)
-    """
-    return _send_brevo_email(student_email, subject, _base_email_template(subject, preheader, body_html), student_name=student_name)
 
 
 # 5. Scholarship Deadline Reminder Notification
