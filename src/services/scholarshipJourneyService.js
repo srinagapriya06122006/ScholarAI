@@ -147,6 +147,36 @@ export const MANDATORY_DOC_DEFINITIONS = [
     name: 'Disability Certificate (UDID)',
     reason: 'Mandatory only for Divyangjan / PwD scholarship reservations.',
     howToObtain: 'Issued by the District Medical Board via the Unique Disability ID portal (swavlambancard.gov.in).'
+  },
+  {
+    type: 'sportsQuota',
+    name: 'Sports Quota Certificate',
+    reason: 'Required to claim sports reservation quotas & awards (District, State, National level).',
+    howToObtain: 'Issued by SDAT, SGFI, Association or State Olympic Body.'
+  },
+  {
+    type: 'firstGraduate',
+    name: 'First Graduate Certificate',
+    reason: 'Required for first-generation college graduate fee concessions and grants.',
+    howToObtain: 'Issued by the Revenue Department / Tahsildar via e-Sevai portal.'
+  },
+  {
+    type: 'ncc',
+    name: 'NCC Certificate',
+    reason: 'Required for NCC cadet preference, state youth grants & special admissions.',
+    howToObtain: 'Issued by the Directorate General NCC / Commanding Officer.'
+  },
+  {
+    type: 'nss',
+    name: 'NSS Certificate',
+    reason: 'Required for NSS volunteer reservation and community service excellence awards.',
+    howToObtain: 'Issued by the NSS Programme Coordinator & University.'
+  },
+  {
+    type: 'minority',
+    name: 'Minority Certificate',
+    reason: 'Required for religious and linguistic minority welfare scholarships.',
+    howToObtain: 'Issued by the Revenue Divisional Officer / Tahsildar.'
   }
 ];
 
@@ -212,6 +242,21 @@ export const calculateJourneyState = ({
   }
   if (profile?.disability) {
     requiredDocTypes.push('disability');
+  }
+  if (profile?.sportsQuota) {
+    requiredDocTypes.push('sportsQuota');
+  }
+  if (profile?.firstGraduate) {
+    requiredDocTypes.push('firstGraduate');
+  }
+  if (profile?.ncc) {
+    requiredDocTypes.push('ncc');
+  }
+  if (profile?.nss) {
+    requiredDocTypes.push('nss');
+  }
+  if (profile?.minority) {
+    requiredDocTypes.push('minority');
   }
 
   const requiredDocuments = requiredDocTypes.map(type => {

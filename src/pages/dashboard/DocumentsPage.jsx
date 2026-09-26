@@ -21,7 +21,8 @@ import {
   RefreshCw,
   FileCheck2,
   ShieldCheck,
-  Globe
+  Globe,
+  Info
 } from 'lucide-react';
 import { BrowserAutomationPanel } from '../../components/BrowserAutomationPanel';
 
@@ -36,7 +37,12 @@ export const DocumentsPage = () => {
     tenth: { name: '10th Marksheet', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
     twelfth: { name: '12th Marksheet', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
     college: { name: 'College ID', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
-    disability: { name: 'Disability Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false }
+    disability: { name: 'Disability Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
+    sportsQuota: { name: 'Sports Quota Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
+    firstGraduate: { name: 'First Graduate Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
+    ncc: { name: 'NCC Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
+    nss: { name: 'NSS Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
+    minority: { name: 'Minority Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false }
   });
 
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -418,16 +424,9 @@ export const DocumentsPage = () => {
           isMatch: Boolean(matchGen)
         });
       }
-      const hasDisability = Boolean(
-        userProfile?.disability === true ||
-        String(userProfile?.disability).toLowerCase() === 'yes' ||
-        userProfile?.physicallyChallenged === true ||
-        String(userProfile?.physicallyChallenged).toLowerCase() === 'yes'
-      );
-
       rows.push({
         param: 'Disability Assessment',
-        profile: hasDisability ? 'PwD Certified' : 'Not Declared (Able-Bodied)',
+        profile: userProfile?.disability ? 'PwD Certified' : 'Not Declared (Able-Bodied)',
         ocr: ext.percentage ? `${ext.percentage}% Benchmark` : (ext.disability_status || 'Extracted'),
         isMatch: true
       });
@@ -439,6 +438,91 @@ export const DocumentsPage = () => {
           isMatch: true
         });
       }
+    } else if (key === 'sportsQuota') {
+      rows.push({
+        param: 'Athlete Name',
+        profile: userProfile?.fullName || 'N/A',
+        ocr: ext.name || 'Not Extracted',
+        isMatch: isNameMatch(userProfile?.fullName, ext.name)
+      });
+      if (ext.sport_name) {
+        rows.push({
+          param: 'Sport / Discipline',
+          profile: 'Sports Quota Candidate',
+          ocr: ext.sport_name,
+          isMatch: true
+        });
+      }
+      if (ext.achievement || ext.competition_level) {
+        rows.push({
+          param: 'Achievement & Level',
+          profile: 'Verified Representation',
+          ocr: `${ext.achievement || ''} (${ext.competition_level || 'State/National'})`,
+          isMatch: true
+        });
+      }
+    } else if (key === 'firstGraduate') {
+      rows.push({
+        param: 'Candidate Name',
+        profile: userProfile?.fullName || 'N/A',
+        ocr: ext.name || 'Not Extracted',
+        isMatch: isNameMatch(userProfile?.fullName, ext.name)
+      });
+      rows.push({
+        param: 'First Graduate Status',
+        profile: userProfile?.firstGraduate ? 'Declared in Profile' : 'Candidate',
+        ocr: ext.first_graduate_status || 'Certified in Document',
+        isMatch: true
+      });
+      if (ext.district) {
+        rows.push({
+          param: 'District / Jurisdiction',
+          profile: userProfile?.state || 'Tamil Nadu',
+          ocr: ext.district,
+          isMatch: true
+        });
+      }
+    } else if (key === 'ncc') {
+      rows.push({
+        param: 'Cadet Name',
+        profile: userProfile?.fullName || 'N/A',
+        ocr: ext.name || 'Not Extracted',
+        isMatch: isNameMatch(userProfile?.fullName, ext.name)
+      });
+      if (ext.cert_type || ext.unit) {
+        rows.push({
+          param: 'NCC Certificate Grade',
+          profile: userProfile?.ncc ? 'NCC Cadet' : 'Candidate',
+          ocr: `${ext.cert_type || "'C' Certificate"} - ${ext.unit || 'NCC Directorate'}`,
+          isMatch: true
+        });
+      }
+    } else if (key === 'nss') {
+      rows.push({
+        param: 'Volunteer Name',
+        profile: userProfile?.fullName || 'N/A',
+        ocr: ext.name || 'Not Extracted',
+        isMatch: isNameMatch(userProfile?.fullName, ext.name)
+      });
+      rows.push({
+        param: 'Service Hours',
+        profile: '240 Hours + Special Camp',
+        ocr: ext.service_hours || 'Completed',
+        isMatch: true
+      });
+    } else if (key === 'minority') {
+      rows.push({
+        param: 'Applicant Name',
+        profile: userProfile?.fullName || 'N/A',
+        ocr: ext.name || 'Not Extracted',
+        isMatch: isNameMatch(userProfile?.fullName, ext.name)
+      });
+      rows.push({
+        param: 'Minority Category',
+        profile: userProfile?.religion || 'Minority Quota',
+        ocr: ext.minority_category || 'Certified',
+        isMatch: true
+      });
     }
 
     return rows;
@@ -450,24 +534,269 @@ export const DocumentsPage = () => {
     userProfile?.physicallyChallenged === true ||
     String(userProfile?.physicallyChallenged).toLowerCase() === 'yes'
   );
+  const hasSportsQuota = Boolean(
+    userProfile?.sportsQuota === true ||
+    String(userProfile?.sportsQuota).toLowerCase() === 'yes'
+  );
+  const hasFirstGraduate = Boolean(
+    userProfile?.firstGraduate === true ||
+    String(userProfile?.firstGraduate).toLowerCase() === 'yes'
+  );
+  const hasNcc = Boolean(
+    userProfile?.ncc === true ||
+    String(userProfile?.ncc).toLowerCase() === 'yes'
+  );
+  const hasNss = Boolean(
+    userProfile?.nss === true ||
+    String(userProfile?.nss).toLowerCase() === 'yes'
+  );
+  const hasMinority = Boolean(
+    userProfile?.minority === true ||
+    String(userProfile?.minority).toLowerCase() === 'yes'
+  );
+
+  const quotaFlags = {
+    disability: hasDisability,
+    sportsQuota: hasSportsQuota,
+    firstGraduate: hasFirstGraduate,
+    ncc: hasNcc,
+    nss: hasNss,
+    minority: hasMinority
+  };
 
   const getDocumentTitle = (key, defaultName) => {
     if (key === 'disability') {
       return hasDisability ? 'Disability Certificate (Required)' : 'Disability Certificate (Not Needed)';
     }
+    if (key === 'sportsQuota') {
+      return hasSportsQuota ? 'Sports Quota Certificate (Required)' : 'Sports Quota Certificate (Optional)';
+    }
+    if (key === 'firstGraduate') {
+      return hasFirstGraduate ? 'First Graduate Certificate (Required)' : 'First Graduate Certificate (Optional)';
+    }
+    if (key === 'ncc') {
+      return hasNcc ? 'NCC Certificate (Required)' : 'NCC Certificate (Optional)';
+    }
+    if (key === 'nss') {
+      return hasNss ? 'NSS Certificate (Required)' : 'NSS Certificate (Optional)';
+    }
+    if (key === 'minority') {
+      return hasMinority ? 'Minority Certificate (Required)' : 'Minority Certificate (Optional)';
+    }
     return defaultName;
   };
 
-  // Compute required document stats (disability only required if profile has disability)
+  // Compute required document stats based on profile quotas
   const requiredDocKeys = ['aadhaar', 'community', 'income', 'tenth', 'twelfth', 'college'];
-  if (hasDisability) {
-    requiredDocKeys.push('disability');
-  }
+  if (hasDisability) requiredDocKeys.push('disability');
+  if (hasSportsQuota) requiredDocKeys.push('sportsQuota');
+  if (hasFirstGraduate) requiredDocKeys.push('firstGraduate');
+  if (hasNcc) requiredDocKeys.push('ncc');
+  if (hasNss) requiredDocKeys.push('nss');
+  if (hasMinority) requiredDocKeys.push('minority');
 
   const uploadedRequiredCount = requiredDocKeys.filter((k) => documents[k]?.uploaded).length;
   const totalRequired = requiredDocKeys.length;
   const verifiedCount = Object.values(documents).filter((d) => ['VERIFIED', 'Verified'].includes(d.status)).length;
   const mismatchCount = Object.values(documents).filter((d) => ['MISMATCH', 'Mismatch', 'OCR_FAILED', 'OCR Failed'].includes(d.status)).length;
+
+  const standardDocKeys = ['aadhaar', 'income', 'college', 'community', 'tenth', 'twelfth'];
+  const allQuotaKeys = ['disability', 'sportsQuota', 'firstGraduate', 'ncc', 'nss', 'minority'];
+
+  // Only display additional certificates for quotas that the user selected in profile (or has already uploaded)
+  const additionalQuotaDocKeys = allQuotaKeys.filter(
+    (key) => Boolean(quotaFlags[key]) || documents[key]?.uploaded
+  );
+
+  const docWhyRequired = {
+    aadhaar: 'Mandatory government identity & age proof for scholarship verification.',
+    income: 'Annual family income verification for means-based concessions and scholarships.',
+    college: 'Bonafide student enrollment, course, and roll number authentication.',
+    community: 'Reservation category proof (OBC, SC, ST, MBC, DNC) for reserved quotas.',
+    tenth: 'Secondary education verification and date of birth authentication.',
+    twelfth: 'Higher secondary marksheet determining scholarship merit percentiles.',
+    disability: 'Mandatory medical board proof (UDID / Form V) for Divyangjan & PwD reservation.',
+    sportsQuota: 'Official verification of State, National, or University athletic representation & awards.',
+    firstGraduate: 'Revenue Department certificate proving applicant is the first college graduate in the family.',
+    ncc: 'Ministry of Defence NCC Cadet A/B/C certification for defence preference.',
+    nss: 'National Service Scheme 240 hrs + 7-day special camp community award.',
+    minority: 'Revenue Department proof of recognized religious or linguistic minority status.'
+  };
+
+  const renderDocCard = (key) => {
+    const doc = documents[key];
+    if (!doc) return null;
+
+    const statusUpper = (doc.status || '').toUpperCase();
+    const isVerified = statusUpper === 'VERIFIED';
+    const isMismatch = statusUpper === 'MISMATCH';
+    const isOcrFailed = statusUpper === 'OCR_FAILED';
+    const isVerifying = statusUpper === 'VERIFYING' || statusUpper === 'OCR_PROCESSING';
+    const isUploaded = statusUpper === 'UPLOADED' || doc.uploaded;
+    const isQuotaKey = allQuotaKeys.includes(key);
+    const isQuotaRequired = Boolean(quotaFlags[key]);
+    const docTitle = getDocumentTitle(key, doc.name);
+    const whyRequiredText = docWhyRequired[key] || 'Required for scholarship profile verification.';
+
+    return (
+      <GlassCard
+        key={key}
+        className={`border flex flex-col justify-between p-6 transition-all duration-300 ${
+          isVerified
+            ? 'border-emerald-500/40 bg-emerald-500/[0.02] shadow-emerald-500/5'
+            : isMismatch
+            ? 'border-rose-500/40 bg-rose-500/[0.02] shadow-rose-500/5'
+            : isQuotaKey && isQuotaRequired && !isUploaded
+            ? 'border-amber-500/40 bg-amber-500/[0.02]'
+            : 'border-white/20'
+        }`}
+      >
+        <div>
+          {/* Card Header */}
+          <div className="flex justify-between items-start mb-3">
+            <div className={`p-3 rounded-2xl text-white shadow-md ${
+              isQuotaKey ? 'bg-gradient-to-tr from-amber-500 to-indigo-600' : 'bg-gradient-to-tr from-sky-500 to-indigo-600'
+            }`}>
+              <FileText className="w-5 h-5" />
+            </div>
+
+            <span
+              className={`text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${
+                isVerified
+                  ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                  : isMismatch
+                  ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                  : isOcrFailed
+                  ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30'
+                  : isVerifying
+                  ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                  : isUploaded
+                  ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30'
+                  : isQuotaKey && isQuotaRequired
+                  ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-black'
+                  : 'bg-slate-500/20 text-slate-400 border border-slate-500/20'
+              }`}
+            >
+              {isVerifying && <Loader className="w-3 h-3 animate-spin" />}
+              {isVerified && <Check className="w-3 h-3" />}
+              {isMismatch && <X className="w-3 h-3" />}
+              {isQuotaKey && isQuotaRequired && !isUploaded
+                ? 'Required (Quota)'
+                : (doc.status || 'Pending')}
+            </span>
+          </div>
+
+          <h3 className="text-base font-bold text-slate-850 dark:text-slate-200 mb-1.5">{docTitle}</h3>
+
+          {/* Why it is required Banner */}
+          <div className="mb-3 px-3 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/50 text-[11px] leading-relaxed text-slate-600 dark:text-slate-350">
+            <span className="font-bold text-slate-800 dark:text-slate-200">Why required: </span>
+            {whyRequiredText}
+          </div>
+
+          {doc.uploaded && (
+            <p className="text-xs text-sky-600 dark:text-sky-400 mb-4 font-mono truncate">
+              Uploaded: {doc.filename}
+            </p>
+          )}
+        </div>
+
+        {/* Card Action Buttons */}
+        <div className="flex flex-col gap-2 pt-4 border-t border-slate-300/30 dark:border-slate-800/30">
+          {!doc.uploaded ? (
+            <>
+              <div className="flex items-center gap-2">
+                <label className="flex-1 flex justify-center items-center gap-2 py-2.5 px-3 rounded-xl border border-dashed border-sky-500 hover:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold text-xs cursor-pointer transition-all">
+                  <Upload className="w-3.5 h-3.5" /> Upload File
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e, key)}
+                    className="hidden"
+                  />
+                </label>
+                <label
+                  className="flex-1 flex justify-center items-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md"
+                  title="Upload and run instant OCR verification against your profile"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Verify</span>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e, key)}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <Link
+                to={`/dashboard/certificates?type=${key}`}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-bold border border-indigo-500/20 transition-all shadow-sm"
+                title="Create and auto-fill this certificate using Certificate Creator Agent"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Generate Certificate (AI Agent)</span>
+              </Link>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPreviewDoc(doc)}
+                  className="flex-1 flex justify-center items-center gap-1 py-2.5 px-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all cursor-pointer"
+                  title="Preview uploaded image/pdf"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Preview
+                </button>
+
+                {/* Verify Button (Runs OCR & opens profile vs document comparison) */}
+                <button
+                  onClick={() => triggerVerification(key, true)}
+                  disabled={doc.status === 'Verifying'}
+                  className="flex-1 flex justify-center items-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  title="Run OCR verification and compare document fields against your profile"
+                >
+                  {doc.status === 'Verifying' ? (
+                    <Loader className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  )}
+                  <span>Verify</span>
+                </button>
+
+                {/* Modal Comparison Details Button */}
+                <button
+                  onClick={() => setViewingComparison({ key, docName: docTitle })}
+                  className="p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-bold text-xs transition-all cursor-pointer"
+                  title="Compare Profile vs Document Data"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={() => handleDelete(key)}
+                  className="p-2.5 rounded-xl border border-rose-500/30 hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer"
+                  title="Delete Document"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <Link
+                to={`/dashboard/certificates?type=${key}`}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all"
+                title="Regenerate this certificate in Certificate Creator"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Re-generate with AI Agent</span>
+              </Link>
+            </>
+          )}
+        </div>
+      </GlassCard>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-custom-image flex flex-col justify-between overflow-x-hidden relative transition-colors duration-300">
@@ -498,9 +827,9 @@ export const DocumentsPage = () => {
       </nav>
 
       {/* Main Container */}
-      <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-8 relative z-10">
+      <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-8 relative z-10 flex flex-col gap-10">
         {/* Header with Stats & Verification Action */}
-        <div className="mb-8 animate-slide-up flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-white/70 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xl shadow-xl">
+        <div className="animate-slide-up flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-white/70 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xl shadow-xl">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
@@ -533,7 +862,7 @@ export const DocumentsPage = () => {
               to="/dashboard/certificates"
               className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0"
             >
-              <span>🪄 Certificate Creator →</span>
+              <span>🪄 Certificate Creator Agent →</span>
             </Link>
 
             <button
@@ -556,166 +885,87 @@ export const DocumentsPage = () => {
           </div>
         </div>
 
-        {/* Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
-          {Object.entries(documents).map(([key, doc]) => {
-            const statusUpper = (doc.status || '').toUpperCase();
-            const isVerified = statusUpper === 'VERIFIED';
-            const isMismatch = statusUpper === 'MISMATCH';
-            const isOcrFailed = statusUpper === 'OCR_FAILED';
-            const isVerifying = statusUpper === 'VERIFYING' || statusUpper === 'OCR_PROCESSING';
-            const isUploaded = statusUpper === 'UPLOADED' || doc.uploaded;
-            const isDisabilityKey = key === 'disability';
-            const isNotNeeded = isDisabilityKey && !hasDisability && !isUploaded;
-            const docTitle = getDocumentTitle(key, doc.name);
+        {/* 1. Standard Required Certificates Section */}
+        <section className="animate-slide-up">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                  <FileText className="w-4 h-4" />
+                </span>
+                <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                  1. Standard Required Certificates
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Standard baseline verification certificates required for all student scholarship applications.
+              </p>
+            </div>
+            <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 border border-slate-300/60 dark:border-slate-700">
+              6 Documents
+            </span>
+          </div>
 
-            const comparisonRows = doc.uploaded ? getComparisonRows(key, doc) : [];
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {standardDocKeys.map((key) => renderDocCard(key))}
+          </div>
+        </section>
 
-            return (
-              <GlassCard
-                key={key}
-                className={`border flex flex-col justify-between p-6 transition-all duration-300 ${
-                  isVerified
-                    ? 'border-emerald-500/40 bg-emerald-500/[0.02] shadow-emerald-500/5'
-                    : isMismatch
-                    ? 'border-rose-500/40 bg-rose-500/[0.02] shadow-rose-500/5'
-                    : isNotNeeded
-                    ? 'border-slate-700/40 bg-slate-900/30 opacity-75'
-                    : isDisabilityKey && hasDisability && !isUploaded
-                    ? 'border-amber-500/40 bg-amber-500/[0.02]'
-                    : 'border-white/20'
-                }`}
+        {/* 2. Additional Certificates Based on Selected Quotas Section */}
+        <section className="animate-slide-up">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <Sparkles className="w-4 h-4" />
+                </span>
+                <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                  2. Additional Certificates Based on Selected Quotas
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Automatically determined from your selected quotas in Profile. Unselected quotas are omitted.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/dashboard/profile"
+                className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
               >
-                <div>
-                  {/* Card Header */}
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="p-3 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-md">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    
-                    <span
-                      className={`text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-sm ${
-                        isVerified
-                          ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                          : isMismatch
-                          ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30'
-                          : isOcrFailed
-                          ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30'
-                          : isVerifying
-                          ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                          : isUploaded
-                          ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30'
-                          : isNotNeeded
-                          ? 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
-                          : isDisabilityKey && hasDisability
-                          ? 'bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 font-black'
-                          : 'bg-slate-500/20 text-slate-400 border border-slate-500/20'
-                      }`}
-                    >
-                      {isVerifying && <Loader className="w-3 h-3 animate-spin" />}
-                      {isVerified && <Check className="w-3 h-3" />}
-                      {isMismatch && <X className="w-3 h-3" />}
-                      {isNotNeeded
-                        ? 'Not Needed'
-                        : isDisabilityKey && hasDisability && !isUploaded
-                        ? 'Required'
-                        : (doc.status || 'Pending')}
-                    </span>
-                  </div>
+                <span>Edit Quotas in Profile</span>
+              </Link>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                {additionalQuotaDocKeys.length} Active
+              </span>
+            </div>
+          </div>
 
-                  <h3 className="text-base font-bold text-slate-850 dark:text-slate-200 mb-1">{docTitle}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-                    {doc.uploaded
-                      ? `File: ${doc.filename}${isDisabilityKey && !hasDisability ? ' (Optional / Not declared in profile)' : ''}`
-                      : isDisabilityKey && hasDisability
-                      ? 'Mandatory requirement for your profile to claim PwD reservation & benefits.'
-                      : isDisabilityKey && !hasDisability
-                      ? 'Not required for your profile (Able-Bodied / No Disability declared).'
-                      : `Please upload a high-quality copy of your ${doc.name.toLowerCase()}.`}
-                  </p>
-                </div>
-
-                {/* Card Action Buttons */}
-                <div className="flex flex-col gap-2 pt-4 border-t border-slate-300/30 dark:border-slate-800/30">
-                  {!doc.uploaded ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <label className="flex-1 flex justify-center items-center gap-2 py-2.5 px-3 rounded-xl border border-dashed border-sky-500 hover:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold text-xs cursor-pointer transition-all">
-                          <Upload className="w-3.5 h-3.5" /> Upload File
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => handleFileUpload(e, key)}
-                            className="hidden"
-                          />
-                        </label>
-                        <label
-                          className="flex-1 flex justify-center items-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md"
-                          title="Upload and run instant OCR verification against your profile"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Verify</span>
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => handleFileUpload(e, key)}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setPreviewDoc(doc)}
-                          className="flex-1 flex justify-center items-center gap-1 py-2.5 px-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all cursor-pointer"
-                          title="Preview uploaded image/pdf"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> Preview
-                        </button>
-
-                        {/* Verify Button (Runs OCR & opens profile vs document comparison) */}
-                        <button
-                          onClick={() => triggerVerification(key, true)}
-                          disabled={doc.status === 'Verifying'}
-                          className="flex-1 flex justify-center items-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md disabled:opacity-50"
-                          title="Run OCR verification and compare document fields against your profile"
-                        >
-                          {doc.status === 'Verifying' ? (
-                            <Loader className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                          )}
-                          <span>Verify</span>
-                        </button>
-
-                        {/* Modal Comparison Details Button */}
-                        <button
-                          onClick={() => setViewingComparison({ key, docName: docTitle })}
-                          className="p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-bold text-xs transition-all cursor-pointer"
-                          title="Compare Profile vs Document Data"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => handleDelete(key)}
-                          className="p-2.5 rounded-xl border border-rose-500/30 hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer"
-                          title="Delete Document"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                    </>
-                  )}
-                </div>
-              </GlassCard>
-            );
-          })}
-        </div>
+          {additionalQuotaDocKeys.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {additionalQuotaDocKeys.map((key) => renderDocCard(key))}
+            </div>
+          ) : (
+            <div className="p-8 rounded-3xl bg-white/40 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-800 text-center flex flex-col items-center justify-center gap-3">
+              <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400">
+                <Info className="w-6 h-6" />
+              </div>
+              <div className="max-w-md">
+                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">
+                  No Additional Quotas Selected
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-3">
+                  If you qualify for Disability, Sports Quota, First Graduate, NCC, NSS, or Minority benefits, check them in your Profile. The system will automatically add their required certificates here.
+                </p>
+                <Link
+                  to="/dashboard/profile"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white text-xs font-bold shadow-md hover:opacity-95"
+                >
+                  Go to Profile & Select Quotas
+                </Link>
+              </div>
+            </div>
+          )}
+        </section>
       </main>
 
       {/* Comparison Modal */}

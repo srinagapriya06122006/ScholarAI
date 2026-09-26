@@ -261,7 +261,7 @@ class VerificationAgent:
         reasons = []
 
         # 1. Verify Name (required for identity documents)
-        if doc.document_type in ("aadhaar", "college", "tenth", "twelfth", "disability"):
+        if doc.document_type in ("aadhaar", "college", "tenth", "twelfth", "disability", "sportsQuota", "sports", "firstGraduate", "ncc", "nss", "minority"):
             ocr_name = extracted_data.get("name")
             if ocr_name:
                 if not self._names_match(user.fullName, ocr_name):
@@ -403,6 +403,27 @@ class VerificationAgent:
                         "reason": f"Gender mismatch: Entered '{profile.gender}', Document says '{ocr_gender}'"
                     }
                     reasons.append(f"Gender mismatch: Entered '{profile.gender}', Document says '{ocr_gender}'")
+
+        elif doc_type in ("sportsQuota", "sports"):
+            if profile and not getattr(profile, "sportsQuota", False):
+                # Note: soft check so verified document can also update profile
+                pass
+
+        elif doc_type == "firstGraduate":
+            if profile and not getattr(profile, "firstGraduate", False):
+                pass
+
+        elif doc_type == "ncc":
+            if profile and not getattr(profile, "ncc", False):
+                pass
+
+        elif doc_type == "nss":
+            if profile and not getattr(profile, "nss", False):
+                pass
+
+        elif doc_type == "minority":
+            if profile and not getattr(profile, "minority", False):
+                pass
 
         # 3. Document classification mismatch check
         classification_warning = extracted_data.get("classification_warning")

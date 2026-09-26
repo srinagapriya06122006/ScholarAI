@@ -1303,6 +1303,119 @@ def generate_document(
             "issuing_authority": hospital,
             "date": date_issued
         })
+    elif document_type in ("sportsQuota", "sports"):
+        name = fields.get("name") or current_user.fullName
+        sport_name = fields.get("sport_name") or "Athletics (400m Track & Field)"
+        level = fields.get("competition_level") or "State Level Championship"
+        achievement = fields.get("achievement") or "Gold Medalist / 1st Position"
+        cert_no = fields.get("certificate_no") or "SDAT/SP/2023/491"
+        issuing_authority = fields.get("issuing_authority") or "Sports Development Authority of Tamil Nadu"
+        date_issued = fields.get("date") or "14-08-2023"
+        ocr_data.name = name
+        extracted_fields.update({
+            "name": name,
+            "sport_name": sport_name,
+            "competition_level": level,
+            "achievement": achievement,
+            "certificate_no": cert_no,
+            "issuing_authority": issuing_authority,
+            "sports_status": "Eligible",
+            "date": date_issued
+        })
+        profile = crud.get_user_profile(db, current_user.id)
+        if profile:
+            profile.sportsQuota = True
+            db.add(profile)
+    elif document_type == "firstGraduate":
+        name = fields.get("name") or current_user.fullName
+        cert_no = fields.get("certificate_no") or "FG-TN-2023-88319"
+        father_name = fields.get("father_name") or "Peter"
+        district = fields.get("district") or "Chennai"
+        issuing_authority = fields.get("issuing_authority") or fields.get("issuing_officer") or "Headquarters Deputy Tahsildar"
+        date_issued = fields.get("date") or "20-06-2023"
+        ocr_data.name = name
+        extracted_fields.update({
+            "name": name,
+            "certificate_no": cert_no,
+            "father_name": father_name,
+            "district": district,
+            "first_graduate_status": "Eligible",
+            "issuing_authority": issuing_authority,
+            "date": date_issued
+        })
+        profile = crud.get_user_profile(db, current_user.id)
+        if profile:
+            profile.firstGraduate = True
+            db.add(profile)
+    elif document_type == "ncc":
+        name = fields.get("name") or current_user.fullName
+        cert_no = fields.get("certificate_no") or "NCC/TN/2023/C-0842"
+        unit = fields.get("unit") or "1 (TN) CTC NCC, Anna University"
+        directorate = fields.get("directorate") or "Tamil Nadu, Puducherry & A&N Directorate"
+        cert_type = fields.get("cert_type") or "'C' Certificate (Alpha Grade)"
+        rank = fields.get("rank") or "Senior Under Officer (SUO)"
+        issuing_authority = fields.get("issuing_authority") or "Group Commander, NCC Group HQ"
+        date_issued = fields.get("date") or "15-03-2023"
+        ocr_data.name = name
+        extracted_fields.update({
+            "name": name,
+            "certificate_no": cert_no,
+            "unit": unit,
+            "directorate": directorate,
+            "cert_type": cert_type,
+            "rank": rank,
+            "ncc_status": "Eligible",
+            "issuing_authority": issuing_authority,
+            "date": date_issued
+        })
+        profile = crud.get_user_profile(db, current_user.id)
+        if profile:
+            profile.ncc = True
+            db.add(profile)
+    elif document_type == "nss":
+        name = fields.get("name") or current_user.fullName
+        cert_no = fields.get("certificate_no") or "NSS-TN-2023-4512"
+        college = fields.get("college") or "Sona College of Technology"
+        service_hours = fields.get("service_hours") or "240 Hours + 7-Day Special Camp"
+        camp_name = fields.get("camp_name") or "Youth for Cleanliness & Green Environment"
+        issuing_authority = fields.get("issuing_authority") or "NSS Programme Coordinator"
+        date_issued = fields.get("date") or "10-05-2023"
+        ocr_data.name = name
+        extracted_fields.update({
+            "name": name,
+            "certificate_no": cert_no,
+            "college": college,
+            "service_hours": service_hours,
+            "camp_name": camp_name,
+            "nss_status": "Eligible",
+            "issuing_authority": issuing_authority,
+            "date": date_issued
+        })
+        profile = crud.get_user_profile(db, current_user.id)
+        if profile:
+            profile.nss = True
+            db.add(profile)
+    elif document_type == "minority":
+        name = fields.get("name") or current_user.fullName
+        cert_no = fields.get("certificate_no") or "MIN-TN-2023-7741"
+        category = fields.get("community_religion") or fields.get("religion") or "Muslim"
+        language = fields.get("language") or "Urdu"
+        issuing_authority = fields.get("issuing_authority") or "Revenue Divisional Officer / Tahsildar"
+        date_issued = fields.get("date") or "18-07-2023"
+        ocr_data.name = name
+        extracted_fields.update({
+            "name": name,
+            "certificate_no": cert_no,
+            "minority_category": category,
+            "language": language,
+            "minority_status": "Eligible",
+            "issuing_authority": issuing_authority,
+            "date": date_issued
+        })
+        profile = crud.get_user_profile(db, current_user.id)
+        if profile:
+            profile.minority = True
+            db.add(profile)
             
     doc.extracted_data = json.dumps({
         "ocr_status": "OCR_COMPLETED",

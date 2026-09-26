@@ -12,7 +12,10 @@ import {
   FileCheck,
   Building,
   User,
-  Sparkles
+  Sparkles,
+  Info,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 
 export const CertificateGeneratorPage = () => {
@@ -120,6 +123,66 @@ export const CertificateGeneratorPage = () => {
       percentage: '45',
       diagnosis: 'Post-polio residual paralysis of left lower limb',
       issuing_hospital: 'District Medical Board, Government General Hospital, Tamil Nadu'
+    },
+    // Sports Quota Certificate
+    sportsQuota: {
+      certificate_no: 'SDAT-TN-2023-00491',
+      date: '14-08-2023',
+      name: '',
+      father_name: 'K. Senthil Kumar',
+      sport_name: 'Athletics (400m Track & Field)',
+      competition_level: 'State Championship (Senior Level)',
+      achievement: 'Gold Medalist - 1st Position',
+      issuing_authority: 'Sports Development Authority of Tamil Nadu (SDAT)',
+      representation_year: '2023'
+    },
+    // First Graduate Certificate
+    firstGraduate: {
+      certificate_no: 'FG-TN-2023-88319',
+      date: '20-06-2023',
+      name: '',
+      father_name: 'K. Senthil Kumar',
+      mother_name: 'S. Lakshmi',
+      door_no: '12/4B, South Car Street',
+      village_taluk: 'Palayamkottai Taluk',
+      district: 'Tirunelveli',
+      issuing_officer: 'Headquarters Deputy Tahsildar',
+      declaration: 'Certified that neither the parents nor any of the siblings of the applicant has graduated from any university/college.'
+    },
+    // NCC Certificate
+    ncc: {
+      certificate_no: 'NCC/TN/2023/C-0842',
+      date: '15-03-2023',
+      name: '',
+      father_name: 'K. Senthil Kumar',
+      unit: '1 (TN) CTC NCC, Anna University',
+      directorate: 'Tamil Nadu, Puducherry & A&N Directorate',
+      cert_type: "'C' Certificate (Alpha Grade)",
+      rank: 'Senior Under Officer (SUO)',
+      issuing_authority: 'Group Commander, NCC Group HQ'
+    },
+    // NSS Certificate
+    nss: {
+      certificate_no: 'NSS-TN-2023-4512',
+      date: '10-05-2023',
+      name: '',
+      father_name: 'K. Senthil Kumar',
+      college: 'Sona College of Technology',
+      service_hours: '240 Hours + 7-Day Special Camp',
+      camp_name: 'Youth for Cleanliness & Green Environment',
+      issuing_authority: 'NSS Programme Coordinator & University Registrar'
+    },
+    // Minority Certificate
+    minority: {
+      certificate_no: 'MIN-TN-2023-7741',
+      date: '18-07-2023',
+      name: '',
+      father_name: 'K. Senthil Kumar',
+      community_religion: 'Muslim Community',
+      language: 'Urdu',
+      door_no: '45/2, Mosque Street',
+      district: 'Chennai',
+      issuing_authority: 'Revenue Divisional Officer / Tahsildar'
     }
   });
 
@@ -213,6 +276,27 @@ export const CertificateGeneratorPage = () => {
       } else {
         u.disability.percentage = '45';
       }
+
+      // Sports Quota Certificate
+      if (nameVal) u.sportsQuota.name = nameVal;
+      if (p.state) u.sportsQuota.issuing_authority = `Sports Development Authority of ${p.state} (SDAT)`;
+
+      // First Graduate Certificate
+      if (nameVal) u.firstGraduate.name = nameVal;
+      if (p.state) u.firstGraduate.district = p.state;
+
+      // NCC Certificate
+      if (nameVal) u.ncc.name = nameVal;
+      if (p.state) u.ncc.directorate = `${p.state} & Directorate General NCC`;
+
+      // NSS Certificate
+      if (nameVal) u.nss.name = nameVal;
+      if (p.college) u.nss.college = p.college;
+
+      // Minority Certificate
+      if (nameVal) u.minority.name = nameVal;
+      if (p.religion) u.minority.community_religion = `${p.religion} Community`;
+      if (p.state) u.minority.district = p.state;
 
       return u;
     });
@@ -353,15 +437,94 @@ export const CertificateGeneratorPage = () => {
     profile?.physicallyChallenged === true ||
     String(profile?.physicallyChallenged).toLowerCase() === 'yes'
   );
+  const hasSportsQuota = Boolean(
+    profile?.sportsQuota === true ||
+    String(profile?.sportsQuota).toLowerCase() === 'yes'
+  );
+  const hasFirstGraduate = Boolean(
+    profile?.firstGraduate === true ||
+    String(profile?.firstGraduate).toLowerCase() === 'yes'
+  );
+  const hasNcc = Boolean(
+    profile?.ncc === true ||
+    String(profile?.ncc).toLowerCase() === 'yes'
+  );
+  const hasNss = Boolean(
+    profile?.nss === true ||
+    String(profile?.nss).toLowerCase() === 'yes'
+  );
+  const hasMinority = Boolean(
+    profile?.minority === true ||
+    String(profile?.minority).toLowerCase() === 'yes'
+  );
+
+  const standardDocs = {
+    aadhaar: { name: 'Aadhaar Card', reason: 'Mandatory government identity & age proof for scholarship verification.' },
+    income: { name: 'Income Certificate', reason: 'Annual family income verification for means-based concessions and scholarships.' },
+    college: { name: 'College ID', reason: 'Bonafide student enrollment, course, and roll number authentication.' },
+    community: { name: 'Community Certificate', reason: 'Reservation category proof (OBC, SC, ST, MBC, DNC) for reserved quotas.' },
+    tenth: { name: '10th Marksheet', reason: 'Secondary education verification and date of birth authentication.' },
+    twelfth: { name: '12th Marksheet', reason: 'Higher secondary marksheet determining scholarship merit percentiles.' }
+  };
+
+  const quotaDefs = {
+    disability: {
+      name: 'Disability Certificate',
+      label: 'Disability Certificate (Required for PwD)',
+      selected: hasDisability,
+      reason: 'Mandatory medical board proof (Form V / UDID) for Divyangjan & PwD reservation.'
+    },
+    sportsQuota: {
+      name: 'Sports Quota Certificate',
+      label: 'Sports Quota Certificate (Required for Sports Quota)',
+      selected: hasSportsQuota,
+      reason: 'Official verification of State, National, or University athletic representation & awards.'
+    },
+    firstGraduate: {
+      name: 'First Graduate Certificate',
+      label: 'First Graduate Certificate (Required for First Graduate)',
+      selected: hasFirstGraduate,
+      reason: 'Revenue Department certificate proving applicant is the first college graduate in the family.'
+    },
+    ncc: {
+      name: 'NCC Certificate',
+      label: 'NCC Certificate (Required for NCC Quota)',
+      selected: hasNcc,
+      reason: 'Ministry of Defence NCC Cadet A/B/C certification for defence preference.'
+    },
+    nss: {
+      name: 'NSS Certificate',
+      label: 'NSS Certificate (Required for NSS Quota)',
+      selected: hasNss,
+      reason: 'National Service Scheme 240 hrs + 7-day special camp community award.'
+    },
+    minority: {
+      name: 'Minority Certificate',
+      label: 'Minority Certificate (Required for Minority Quota)',
+      selected: hasMinority,
+      reason: 'Revenue Department proof of recognized religious or linguistic minority status.'
+    }
+  };
+
+  // Only include quota certificates that are selected in the profile!
+  const selectedQuotaDocs = Object.fromEntries(
+    Object.entries(quotaDefs).filter(([key, def]) => def.selected)
+  );
 
   const documentsMap = {
-    aadhaar: 'Aadhaar Card',
-    income: 'Income Certificate',
-    college: 'College ID',
-    community: 'Community Certificate',
-    tenth: '10th Marksheet',
-    twelfth: '12th Marksheet',
-    disability: hasDisability ? 'Disability Certificate (Required for PwD)' : 'Disability Certificate (Not Needed)'
+    ...Object.fromEntries(Object.entries(standardDocs).map(([k, d]) => [k, d.name])),
+    ...Object.fromEntries(Object.entries(selectedQuotaDocs).map(([k, d]) => [k, d.label]))
+  };
+
+  // If user navigated directly via search param to a specific doc type, ensure it's accessible
+  if (quotaDefs[activeDocType] && !documentsMap[activeDocType]) {
+    documentsMap[activeDocType] = quotaDefs[activeDocType].label;
+  }
+
+  const getDocReason = (key) => {
+    if (standardDocs[key]) return standardDocs[key].reason;
+    if (quotaDefs[key]) return quotaDefs[key].reason;
+    return 'Required for scholarship verification.';
   };
 
   return (
@@ -410,21 +573,66 @@ export const CertificateGeneratorPage = () => {
           </button>
         </div>
 
-        {/* Tab Buttons */}
-        <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
-          {Object.entries(documentsMap).map(([key, name]) => (
-            <button
-              key={key}
-              onClick={() => setActiveDocType(key)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                activeDocType === key
-                  ? 'bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-md'
-                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              {name}
-            </button>
-          ))}
+        {/* Tab Buttons Organized by Category */}
+        <div className="flex flex-col gap-3.5 pb-3 border-b border-slate-200 dark:border-slate-800">
+          {/* 1. Standard Required Certificates */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-indigo-500" />
+              <span>1. Standard Required Certificates</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(standardDocs).map(([key, item]) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveDocType(key)}
+                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                    activeDocType === key
+                      ? 'bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-md'
+                      : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Additional Certificates Based on Selected Quotas */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>2. Additional Certificates Based on Selected Quotas ({Object.keys(selectedQuotaDocs).length} Active)</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal lowercase">
+                (automatically updated from your profile)
+              </span>
+            </div>
+            {Object.keys(selectedQuotaDocs).length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(selectedQuotaDocs).map(([key, item]) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveDocType(key)}
+                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 ${
+                      activeDocType === key
+                        ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-md'
+                        : 'bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20'
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-dashed border-slate-300 dark:border-slate-800 text-xs text-slate-500 flex items-center gap-2">
+                <Info className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>No additional quotas selected in profile. Check Disability, Sports Quota, First Graduate, NCC, NSS, or Minority in your profile to automatically require certificates here.</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Form and Preview Split Screen */}
@@ -434,7 +642,7 @@ export const CertificateGeneratorPage = () => {
             <GlassCard className="p-5 flex flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                  <FileCheck className="w-5 h-5 text-indigo-500" /> Fill Details for {documentsMap[activeDocType]}
+                  <FileCheck className="w-5 h-5 text-indigo-500" /> Fill Details for {documentsMap[activeDocType] || activeDocType}
                 </h2>
                 <button
                   onClick={() => autoFillFieldsFromProfile(profile, true)}
@@ -444,6 +652,15 @@ export const CertificateGeneratorPage = () => {
                   <Sparkles className="w-3.5 h-3.5" />
                   Auto-Fill
                 </button>
+              </div>
+
+              {/* Why it is required banner */}
+              <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs text-sky-800 dark:text-sky-300 flex items-start gap-2">
+                <Info className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="block font-bold">Why Required:</strong>
+                  <span>{getDocReason(activeDocType)}</span>
+                </div>
               </div>
 
               <div className="flex flex-col gap-3">
@@ -815,6 +1032,377 @@ export const CertificateGeneratorPage = () => {
                       value={fields.disability.date}
                       onChange={(e) => handleFieldChange('disability', 'date', e.target.value)}
                     />
+                  </>
+                )}
+
+                {/* --- SPORTS QUOTA CERTIFICATE FORM --- */}
+                {activeDocType === 'sportsQuota' && (
+                  <>
+                    <label className="text-xs font-semibold text-slate-500">Certificate Serial No.</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.sportsQuota.certificate_no}
+                      onChange={(e) => handleFieldChange('sportsQuota', 'certificate_no', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Athlete Full Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.sportsQuota.name}
+                      onChange={(e) => handleFieldChange('sportsQuota', 'name', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Father's / Guardian's Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.sportsQuota.father_name}
+                      onChange={(e) => handleFieldChange('sportsQuota', 'father_name', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Sport / Discipline</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.sportsQuota.sport_name}
+                          onChange={(e) => handleFieldChange('sportsQuota', 'sport_name', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Competition Level</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.sportsQuota.competition_level}
+                          onChange={(e) => handleFieldChange('sportsQuota', 'competition_level', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <label className="text-xs font-semibold text-slate-500">Achievement / Position Secured</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.sportsQuota.achievement}
+                      onChange={(e) => handleFieldChange('sportsQuota', 'achievement', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Issuing Sports Federation / Authority</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.sportsQuota.issuing_authority}
+                      onChange={(e) => handleFieldChange('sportsQuota', 'issuing_authority', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Representation Year</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.sportsQuota.representation_year}
+                          onChange={(e) => handleFieldChange('sportsQuota', 'representation_year', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Date of Award</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.sportsQuota.date}
+                          onChange={(e) => handleFieldChange('sportsQuota', 'date', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* --- FIRST GRADUATE CERTIFICATE FORM --- */}
+                {activeDocType === 'firstGraduate' && (
+                  <>
+                    <label className="text-xs font-semibold text-slate-500">Certificate Number</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.firstGraduate.certificate_no}
+                      onChange={(e) => handleFieldChange('firstGraduate', 'certificate_no', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Candidate Full Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.firstGraduate.name}
+                      onChange={(e) => handleFieldChange('firstGraduate', 'name', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Father's Name</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.firstGraduate.father_name}
+                          onChange={(e) => handleFieldChange('firstGraduate', 'father_name', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Mother's Name</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.firstGraduate.mother_name}
+                          onChange={(e) => handleFieldChange('firstGraduate', 'mother_name', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <label className="text-xs font-semibold text-slate-500">Address / Door No & Street</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.firstGraduate.door_no}
+                      onChange={(e) => handleFieldChange('firstGraduate', 'door_no', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Village / Taluk</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.firstGraduate.village_taluk}
+                          onChange={(e) => handleFieldChange('firstGraduate', 'village_taluk', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">District</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.firstGraduate.district}
+                          onChange={(e) => handleFieldChange('firstGraduate', 'district', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <label className="text-xs font-semibold text-slate-500">Issuing Officer / Designation</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.firstGraduate.issuing_officer}
+                      onChange={(e) => handleFieldChange('firstGraduate', 'issuing_officer', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Date of Issue</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.firstGraduate.date}
+                      onChange={(e) => handleFieldChange('firstGraduate', 'date', e.target.value)}
+                    />
+                  </>
+                )}
+
+                {/* --- NCC CERTIFICATE FORM --- */}
+                {activeDocType === 'ncc' && (
+                  <>
+                    <label className="text-xs font-semibold text-slate-500">Certificate No.</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.ncc.certificate_no}
+                      onChange={(e) => handleFieldChange('ncc', 'certificate_no', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Cadet Full Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.ncc.name}
+                      onChange={(e) => handleFieldChange('ncc', 'name', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Rank</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.ncc.rank}
+                          onChange={(e) => handleFieldChange('ncc', 'rank', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Certificate Grade</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.ncc.cert_type}
+                          onChange={(e) => handleFieldChange('ncc', 'cert_type', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <label className="text-xs font-semibold text-slate-500">Unit / Battalion</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.ncc.unit}
+                      onChange={(e) => handleFieldChange('ncc', 'unit', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Directorate</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.ncc.directorate}
+                      onChange={(e) => handleFieldChange('ncc', 'directorate', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Issuing Authority</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.ncc.issuing_authority}
+                          onChange={(e) => handleFieldChange('ncc', 'issuing_authority', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Date of Issue</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.ncc.date}
+                          onChange={(e) => handleFieldChange('ncc', 'date', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* --- NSS CERTIFICATE FORM --- */}
+                {activeDocType === 'nss' && (
+                  <>
+                    <label className="text-xs font-semibold text-slate-500">Certificate Serial No.</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.nss.certificate_no}
+                      onChange={(e) => handleFieldChange('nss', 'certificate_no', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Volunteer Full Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.nss.name}
+                      onChange={(e) => handleFieldChange('nss', 'name', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">College / Institution</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.nss.college}
+                      onChange={(e) => handleFieldChange('nss', 'college', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Completed Service Hours</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.nss.service_hours}
+                      onChange={(e) => handleFieldChange('nss', 'service_hours', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Camp Theme / Project</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.nss.camp_name}
+                      onChange={(e) => handleFieldChange('nss', 'camp_name', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Issuing Authority</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.nss.issuing_authority}
+                          onChange={(e) => handleFieldChange('nss', 'issuing_authority', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Date</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.nss.date}
+                          onChange={(e) => handleFieldChange('nss', 'date', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* --- MINORITY CERTIFICATE FORM --- */}
+                {activeDocType === 'minority' && (
+                  <>
+                    <label className="text-xs font-semibold text-slate-500">Certificate No.</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.minority.certificate_no}
+                      onChange={(e) => handleFieldChange('minority', 'certificate_no', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Applicant Full Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.minority.name}
+                      onChange={(e) => handleFieldChange('minority', 'name', e.target.value)}
+                    />
+                    <label className="text-xs font-semibold text-slate-500">Father's Name</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.minority.father_name}
+                      onChange={(e) => handleFieldChange('minority', 'father_name', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Minority Community</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.minority.community_religion}
+                          onChange={(e) => handleFieldChange('minority', 'community_religion', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Language / Mother Tongue</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.minority.language}
+                          onChange={(e) => handleFieldChange('minority', 'language', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <label className="text-xs font-semibold text-slate-500">Residential Address</label>
+                    <input
+                      type="text"
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                      value={fields.minority.door_no}
+                      onChange={(e) => handleFieldChange('minority', 'door_no', e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">District</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.minority.district}
+                          onChange={(e) => handleFieldChange('minority', 'district', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500">Date of Issue</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white"
+                          value={fields.minority.date}
+                          onChange={(e) => handleFieldChange('minority', 'date', e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -1253,6 +1841,288 @@ export const CertificateGeneratorPage = () => {
                       <div className="w-28 border-t border-slate-400"></div>
                       <span className="font-bold text-slate-800">Chairperson / Specialist</span>
                       <span className="text-[8px] text-slate-500">District Medical Board</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- SPORTS QUOTA CERTIFICATE TEMPLATE --- */}
+              {activeDocType === 'sportsQuota' && (
+                <div id="certificate-template" className="w-[560px] bg-white text-slate-900 border-4 border-amber-600/70 rounded-2xl p-7 shadow-2xl font-serif relative select-none">
+                  <div className="absolute inset-1.5 border-2 border-amber-500/40 rounded-xl pointer-events-none"></div>
+                  {/* Header */}
+                  <div className="text-center border-b-2 border-amber-800/40 pb-3 mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className="w-10 h-10 rounded-full border-2 border-amber-600 flex items-center justify-center text-sm font-black bg-amber-50 shadow-inner">
+                        🏆
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-amber-900 uppercase tracking-widest">
+                      Sports Development Authority / Sports Association
+                    </div>
+                    <div className="text-base font-black text-amber-950 uppercase tracking-wider mt-0.5">
+                      CERTIFICATE OF MERIT & SPORTS QUOTA
+                    </div>
+                    <div className="text-[9px] text-amber-700 italic mt-0.5">
+                      (Official State / National Level Athletic Representation & Achievement)
+                    </div>
+                  </div>
+
+                  {/* Cert No and Date bar */}
+                  <div className="flex justify-between items-center text-[10px] font-semibold text-slate-700 mb-4 bg-amber-50/60 border border-amber-200 rounded-lg px-3 py-1.5 font-sans">
+                    <div>Certificate No: <span className="font-mono font-bold text-amber-950">{fields.sportsQuota.certificate_no}</span></div>
+                    <div>Date of Award: <span className="font-mono font-bold text-amber-950">{fields.sportsQuota.date}</span></div>
+                  </div>
+
+                  {/* Certificate Body */}
+                  <div className="font-sans text-[11px] leading-relaxed mb-4 text-slate-800 text-center px-3">
+                    <p className="mb-2">
+                      This is proudly presented to certify that
+                    </p>
+                    <div className="text-base font-black text-slate-950 uppercase tracking-wide border-b border-dashed border-amber-400 pb-1 inline-block px-4">
+                      {fields.sportsQuota.name || 'ATHLETE FULL NAME'}
+                    </div>
+                    <p className="mt-2">
+                      Son / Daughter of <strong className="text-slate-900">{fields.sportsQuota.father_name}</strong>, has officially represented in the discipline of:
+                    </p>
+                    <div className="my-2.5 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-left">
+                      <div>
+                        <span className="text-[9px] uppercase tracking-wider text-amber-800 font-bold block">Discipline / Sport</span>
+                        <span className="text-xs font-black text-amber-950">{fields.sportsQuota.sport_name}</span>
+                        <span className="text-[10px] text-slate-600 block mt-0.5">Level: <strong>{fields.sportsQuota.competition_level}</strong></span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] uppercase tracking-wider text-amber-800 font-bold block">Achievement</span>
+                        <span className="text-xs font-black text-emerald-700 px-2 py-0.5 rounded bg-emerald-100 border border-emerald-300 inline-block">
+                          {fields.sportsQuota.achievement}
+                        </span>
+                        <span className="text-[9px] text-slate-500 block mt-0.5">Year: {fields.sportsQuota.representation_year}</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-600 italic">
+                      Certified for eligibility under Government of Tamil Nadu / National Sports Quota admission & scholarship reservations.
+                    </p>
+                  </div>
+
+                  {/* Issuing Authority & Signatures */}
+                  <div className="mt-5 pt-3 border-t border-amber-200 flex justify-between items-end text-[9px] text-slate-600 font-sans">
+                    <div className="max-w-[200px]">
+                      <span className="font-bold block text-slate-800">Issuing Federation / Authority:</span>
+                      <span className="text-slate-700">{fields.sportsQuota.issuing_authority}</span>
+                    </div>
+                    <div className="text-center flex flex-col items-center">
+                      <div className="text-xs text-slate-800 italic mb-1 font-bold">K. Vijayakumar, IAS</div>
+                      <div className="w-28 border-t border-slate-400"></div>
+                      <span className="font-bold text-slate-800">Member Secretary / Director</span>
+                      <span className="text-[8px] text-slate-500">Sports Development Authority</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- FIRST GRADUATE CERTIFICATE TEMPLATE --- */}
+              {activeDocType === 'firstGraduate' && (
+                <div id="certificate-template" className="w-[560px] bg-white text-slate-900 border-2 border-slate-500 rounded-xl p-6 shadow-2xl font-serif relative select-none">
+                  {/* Header */}
+                  <div className="text-center border-b-2 border-slate-800 pb-3 mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className="w-8 h-8 rounded-full border border-slate-700 flex items-center justify-center text-xs font-black bg-slate-100">
+                        🏛️
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 uppercase tracking-widest">Government of Tamil Nadu • Revenue Department</div>
+                    <div className="text-[11px] font-semibold text-slate-600">முதல் பட்டதாரி சான்றிதழ்</div>
+                    <div className="text-base font-black text-slate-900 uppercase tracking-wider mt-0.5">FIRST GRADUATE CERTIFICATE</div>
+                    <div className="text-[9px] text-slate-500 italic mt-0.5">
+                      (Issued under G.O. (Ms) No. 85, Higher Education (J2) Department)
+                    </div>
+                  </div>
+
+                  {/* Cert No and Date bar */}
+                  <div className="flex justify-between items-center text-[10px] font-semibold text-slate-700 mb-4 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-sans">
+                    <div>Certificate No: <span className="font-mono font-bold text-slate-900">{fields.firstGraduate.certificate_no}</span></div>
+                    <div>Date of Issue: <span className="font-mono font-bold text-slate-900">{fields.firstGraduate.date}</span></div>
+                  </div>
+
+                  {/* Main Content */}
+                  <div className="text-[11px] font-sans flex flex-col gap-2.5 leading-relaxed text-slate-800">
+                    <p>
+                      This is to certify that Selvan / Selvi <strong className="text-slate-950 uppercase font-bold">{fields.firstGraduate.name || 'APPLICANT NAME'}</strong>, 
+                      Son / Daughter of Thiru <strong className="text-slate-950">{fields.firstGraduate.father_name}</strong> and Tmt <strong className="text-slate-950">{fields.firstGraduate.mother_name}</strong>, 
+                      residing at <strong className="text-slate-900">{fields.firstGraduate.door_no}, {fields.firstGraduate.village_taluk}, {fields.firstGraduate.district} District</strong>,
+                      is eligible for First Graduate tuition fee concession & scholarship benefits.
+                    </p>
+
+                    {/* Official Declaration Banner */}
+                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-950">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 mb-0.5">Statutory Revenue Verification</div>
+                      <p className="text-[10px] text-emerald-900 leading-snug">
+                        {fields.firstGraduate.declaration}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
+                      <div>Family Graduate Count: <strong className="text-slate-900 font-bold">0 (None)</strong></div>
+                      <div>Jurisdiction: <strong className="text-slate-900 font-bold">{fields.firstGraduate.district}</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Issuing Authority & Signatures */}
+                  <div className="mt-5 pt-3 border-t border-slate-300 flex justify-between items-end text-[9px] text-slate-600 font-sans">
+                    <div className="max-w-[220px]">
+                      <span className="font-bold block text-slate-800">Digitally Verified Document:</span>
+                      <span className="text-[8px] text-emerald-700 font-semibold block">✓ Digitally Signed with e-Mudhra Token</span>
+                      <span className="text-slate-500">Government e-District Services Portal</span>
+                    </div>
+                    <div className="text-center flex flex-col items-center">
+                      <div className="text-xs text-slate-800 italic mb-1 font-bold">S. Meenakshi Sundaram</div>
+                      <div className="w-28 border-t border-slate-400"></div>
+                      <span className="font-bold text-slate-800">{fields.firstGraduate.issuing_officer}</span>
+                      <span className="text-[8px] text-slate-500">Revenue Administration, {fields.firstGraduate.district}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- NCC CERTIFICATE TEMPLATE --- */}
+              {activeDocType === 'ncc' && (
+                <div id="certificate-template" className="w-[560px] bg-white text-slate-900 border-4 border-red-700/80 rounded-2xl p-6 shadow-2xl font-serif relative select-none">
+                  <div className="absolute inset-1 border-2 border-indigo-900/40 rounded-xl pointer-events-none"></div>
+                  <div className="text-center border-b-2 border-slate-800 pb-3 mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className="w-9 h-9 rounded-full border-2 border-red-700 flex items-center justify-center text-xs font-black bg-red-50">
+                        🇮🇳
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">Directorate General National Cadet Corps</div>
+                    <div className="text-[10px] text-slate-600 uppercase font-semibold">Ministry of Defence • Government of India</div>
+                    <div className="text-base font-black text-red-900 uppercase tracking-wider mt-0.5">NATIONAL CADET CORPS CERTIFICATE</div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[10px] font-semibold text-slate-700 mb-4 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-sans">
+                    <div>Certificate No: <span className="font-mono font-bold text-slate-900">{fields.ncc.certificate_no}</span></div>
+                    <div>Date: <span className="font-mono font-bold text-slate-900">{fields.ncc.date}</span></div>
+                  </div>
+
+                  <div className="text-[11px] font-sans flex flex-col gap-2 text-slate-800 leading-relaxed text-center px-4">
+                    <p>This is to certify that Rank <strong className="text-red-950 font-bold">{fields.ncc.rank}</strong></p>
+                    <div className="text-base font-black text-slate-950 uppercase tracking-wide border-b border-slate-300 pb-1 inline-block px-4">
+                      {fields.ncc.name || 'CADET FULL NAME'}
+                    </div>
+                    <p className="mt-1">
+                      Son / Daughter of <strong className="text-slate-900">{fields.ncc.father_name}</strong>
+                    </p>
+                    <div className="my-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-left text-[10px] grid grid-cols-2 gap-2">
+                      <div>Unit: <strong className="text-slate-900 block font-semibold">{fields.ncc.unit}</strong></div>
+                      <div>Directorate: <strong className="text-slate-900 block font-semibold">{fields.ncc.directorate}</strong></div>
+                    </div>
+                    <div className="p-2.5 bg-red-50 border border-red-300 rounded-xl text-center">
+                      <span className="text-[9px] uppercase tracking-wider text-red-800 font-bold block">Examination Qualified</span>
+                      <span className="text-sm font-black text-red-950">{fields.ncc.cert_type}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-slate-300 flex justify-between items-end text-[9px] text-slate-600 font-sans">
+                    <div>
+                      <span className="font-bold block text-slate-800">Commanding Officer:</span>
+                      <span>Col. Rajeshwar Singh, Sena Medal</span>
+                    </div>
+                    <div className="text-center flex flex-col items-center">
+                      <div className="text-xs text-slate-800 italic mb-1 font-bold">Brig. K. Narayanan</div>
+                      <div className="w-28 border-t border-slate-400"></div>
+                      <span className="font-bold text-slate-800">{fields.ncc.issuing_authority}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- NSS CERTIFICATE TEMPLATE --- */}
+              {activeDocType === 'nss' && (
+                <div id="certificate-template" className="w-[560px] bg-white text-slate-900 border-4 border-blue-700/80 rounded-2xl p-6 shadow-2xl font-serif relative select-none">
+                  <div className="text-center border-b-2 border-blue-900/30 pb-3 mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className="w-9 h-9 rounded-full border-2 border-blue-700 flex items-center justify-center text-xs font-black bg-blue-50">
+                        ☸️
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-blue-950 uppercase tracking-widest">National Service Scheme (NSS)</div>
+                    <div className="text-[9px] text-slate-600 uppercase font-semibold">Ministry of Youth Affairs & Sports • Government of India</div>
+                    <div className="text-base font-black text-blue-900 uppercase tracking-wider mt-0.5">CERTIFICATE OF MERIT</div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[10px] font-semibold text-slate-700 mb-4 bg-blue-50/60 border border-blue-200 rounded-lg px-3 py-1.5 font-sans">
+                    <div>Certificate No: <span className="font-mono font-bold text-blue-950">{fields.nss.certificate_no}</span></div>
+                    <div>Date: <span className="font-mono font-bold text-blue-950">{fields.nss.date}</span></div>
+                  </div>
+
+                  <div className="text-[11px] font-sans flex flex-col gap-2 text-slate-800 leading-relaxed text-center px-4">
+                    <p>This is to certify that Volunteer</p>
+                    <div className="text-base font-black text-slate-950 uppercase tracking-wide border-b border-blue-300 pb-1 inline-block px-4">
+                      {fields.nss.name || 'VOLUNTEER FULL NAME'}
+                    </div>
+                    <p className="mt-1">
+                      Student of <strong className="text-slate-900">{fields.nss.college}</strong>
+                    </p>
+                    <div className="my-2 p-2.5 bg-blue-50/80 border border-blue-200 rounded-xl text-center">
+                      <span className="text-[9px] uppercase tracking-wider text-blue-800 font-bold block">Service Completed</span>
+                      <span className="text-xs font-black text-blue-950">{fields.nss.service_hours}</span>
+                      <span className="text-[10px] text-slate-600 block mt-1">Theme: <em>{fields.nss.camp_name}</em></span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-slate-300 flex justify-between items-end text-[9px] text-slate-600 font-sans">
+                    <div>
+                      <span className="font-bold block text-slate-800">NSS Programme Officer</span>
+                      <span className="text-slate-500">Unit Level</span>
+                    </div>
+                    <div className="text-center flex flex-col items-center">
+                      <div className="text-xs text-slate-800 italic mb-1 font-bold">Dr. S. Karthikeyan</div>
+                      <div className="w-28 border-t border-slate-400"></div>
+                      <span className="font-bold text-slate-800">{fields.nss.issuing_authority}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* --- MINORITY CERTIFICATE TEMPLATE --- */}
+              {activeDocType === 'minority' && (
+                <div id="certificate-template" className="w-[560px] bg-white text-slate-900 border-2 border-slate-600 rounded-xl p-6 shadow-2xl font-serif relative select-none">
+                  <div className="text-center border-b-2 border-slate-800 pb-3 mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className="w-8 h-8 rounded-full border border-slate-700 flex items-center justify-center text-xs font-black bg-slate-100">
+                        ⚖️
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">Government of India / State Revenue Department</div>
+                    <div className="text-base font-black text-slate-900 uppercase tracking-wider mt-0.5">RELIGIOUS / LINGUISTIC MINORITY CERTIFICATE</div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[10px] font-semibold text-slate-700 mb-4 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-sans">
+                    <div>Certificate No: <span className="font-mono font-bold text-slate-900">{fields.minority.certificate_no}</span></div>
+                    <div>Date of Issue: <span className="font-mono font-bold text-slate-900">{fields.minority.date}</span></div>
+                  </div>
+
+                  <div className="text-[11px] font-sans flex flex-col gap-2.5 text-slate-800 leading-relaxed">
+                    <p>
+                      This is to certify that <strong className="text-slate-950 uppercase font-bold">{fields.minority.name || 'APPLICANT NAME'}</strong>,
+                      Son / Daughter of <strong className="text-slate-900">{fields.minority.father_name}</strong>, residing at {fields.minority.door_no}, {fields.minority.district},
+                      belongs to the <strong className="text-indigo-950 font-bold">{fields.minority.community_religion}</strong> community (Mother Tongue: <strong>{fields.minority.language}</strong>).
+                    </p>
+                    <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-[10px]">
+                      This community is notified as a Minority Community under Section 2(c) of the National Commission for Minorities Act, 1992.
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-slate-300 flex justify-between items-end text-[9px] text-slate-600 font-sans">
+                    <div>
+                      <span className="font-bold block text-slate-800">Competent Authority:</span>
+                      <span>{fields.minority.issuing_authority}</span>
+                    </div>
+                    <div className="text-center flex flex-col items-center">
+                      <div className="text-xs text-slate-800 italic mb-1 font-bold">M. Selvaraj, B.Sc.</div>
+                      <div className="w-28 border-t border-slate-400"></div>
+                      <span className="font-bold text-slate-800">Tahsildar / RDO</span>
+                      <span className="text-[8px] text-slate-500">Revenue Administration</span>
                     </div>
                   </div>
                 </div>

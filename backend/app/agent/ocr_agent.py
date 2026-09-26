@@ -124,6 +124,12 @@ class TesseractOCREngine(BaseOCREngine):
             "college": "College Transcript",
             "college_id": "College ID",
             "disability": "Disability Certificate",
+            "sportsQuota": "Sports Quota Certificate",
+            "sports": "Sports Quota Certificate",
+            "firstGraduate": "First Graduate Certificate",
+            "ncc": "NCC Certificate",
+            "nss": "NSS Certificate",
+            "minority": "Minority Certificate",
             "Unknown": "Unknown Document"
         }
 
@@ -170,7 +176,7 @@ class TesseractOCREngine(BaseOCREngine):
                         return candidate
                     if expected_type in ("tenth", "twelfth") and parsed.get("calculated_percentage") is not None:
                         return candidate
-                    if expected_type == "disability" and parsed.get("name") is not None:
+                    if expected_type in ("disability", "sportsQuota", "sports", "firstGraduate", "ncc", "nss", "minority") and parsed.get("name") is not None:
                         return candidate
                     
                     if not best_text:
@@ -195,7 +201,7 @@ class TesseractOCREngine(BaseOCREngine):
                         return candidate
                     if expected_type in ("tenth", "twelfth") and parsed.get("calculated_percentage") is not None:
                         return candidate
-                    if expected_type == "disability" and parsed.get("name") is not None:
+                    if expected_type in ("disability", "sportsQuota", "sports", "firstGraduate", "ncc", "nss", "minority") and parsed.get("name") is not None:
                         return candidate
             except Exception as e:
                 print(f"[OCR Pipeline Preprocessed] Exception on PSM {psm_flag}: {e}")
@@ -326,6 +332,16 @@ class TesseractOCREngine(BaseOCREngine):
             return self._parse_marks(text, doc_type)
         elif doc_type == "disability":
             return self._parse_disability(text)
+        elif doc_type in ("sportsQuota", "sports"):
+            return self._parse_sports(text)
+        elif doc_type == "firstGraduate":
+            return self._parse_first_graduate(text)
+        elif doc_type == "ncc":
+            return self._parse_ncc(text)
+        elif doc_type == "nss":
+            return self._parse_nss(text)
+        elif doc_type == "minority":
+            return self._parse_minority(text)
         return {}
 
     def _parse_disability(self, text: str) -> dict:
@@ -389,6 +405,161 @@ class TesseractOCREngine(BaseOCREngine):
             result["date"] = m_date.group(1).strip()
 
         result["disability_status"] = "Verified PwD"
+        return result
+
+    def _parse_sports(self, text: str) -> dict:
+        result = {}
+        # 1. Athlete Name
+        m_name = re.search(r"certify\s+that\s+([A-Za-z\s\.]+?)(?:,|\s+Son|\s+Daughter|\s+Ward|\s+has|\n)", text, re.IGNORECASE)
+        if m_name:
+            val = re.sub(r'[^a-zA-Z\s\.]', '', m_name.group(1)).strip()
+            if len(val) >= 2:
+                result["name"] = val
+        if not result.get("name"):
+            m_name2 = re.search(r"(?:Athlete\s+Name|Name|Player)\s*[:/]?\s*([A-Za-z\s\.]+)", text, re.IGNORECASE)
+            if m_name2:
+                val = re.sub(r'[^a-zA-Z\s\.]', '', m_name2.group(1)).strip()
+                if len(val) >= 2:
+                    result["name"] = val
+
+        # 2. Certificate No
+        m_cert = re.search(r"Certificate\s*(?:No|Number|Serial|Sl\s*No)\s*[:/]?\s*([A-Za-z0-9\-/]+)", text, re.IGNORECASE)
+        if m_cert:
+            result["certificate_no"] = m_cert.group(1).strip()
+
+        # 3. Sport Name
+        m_sport = re.search(r"(?:Sport|Discipline|Game|event\s+of)\s*[:/]?\s*([^\n,]+)", text, re.IGNORECASE)
+        if m_sport:
+            result["sport_name"] = m_sport.group(1).strip()
+
+        # 4. Achievement / Position
+        m_ach = re.search(r"(Gold\s+Medal\w*|Silver\s+Medal\w*|Bronze\s+Medal\w*|1st\s+Position|2nd\s+Position|3rd\s+Position|Winner|Runner|Participation)", text, re.IGNORECASE)
+        if m_ach:
+            result["achievement"] = m_ach.group(1).strip()
+
+        # 5. Competition Level
+        m_lvl = re.search(r"(National\s+Level|State\s+Level|District\s+Level|Inter-University|SGFI|All\s+India)", text, re.IGNORECASE)
+        if m_lvl:
+            result["competition_level"] = m_lvl.group(1).strip()
+
+        result["sports_status"] = "Eligible Sports Quota"
+        return result
+
+    def _parse_first_graduate(self, text: str) -> dict:
+        result = {}
+        # 1. Candidate Name
+        m_name = re.search(r"(?:Selvi|Thiru|certify\s+that)\s+([A-Za-z\s\.]+?)(?:,|\s+Son|\s+Daughter|\s+residing|\n)", text, re.IGNORECASE)
+        if m_name:
+            val = re.sub(r'[^a-zA-Z\s\.]', '', m_name.group(1)).strip()
+            if len(val) >= 2:
+                result["name"] = val
+        if not result.get("name"):
+            m_name2 = re.search(r"(?:Candidate\s+Name|Applicant\s+Name|Name)\s*[:/]?\s*([A-Za-z\s\.]+)", text, re.IGNORECASE)
+            if m_name2:
+                val = re.sub(r'[^a-zA-Z\s\.]', '', m_name2.group(1)).strip()
+                if len(val) >= 2:
+                    result["name"] = val
+
+        # 2. Certificate No
+        m_cert = re.search(r"Certificate\s*(?:No|Number)\s*[:/]?\s*([A-Za-z0-9\-/]+)", text, re.IGNORECASE)
+        if m_cert:
+            result["certificate_no"] = m_cert.group(1).strip()
+
+        # 3. District
+        m_dist = re.search(r"District\s*[:/]?\s*([A-Za-z\s]+)", text, re.IGNORECASE)
+        if m_dist:
+            result["district"] = m_dist.group(1).strip()
+
+        result["first_graduate_status"] = "Verified First Graduate"
+        return result
+
+    def _parse_ncc(self, text: str) -> dict:
+        result = {}
+        # 1. Cadet Name
+        m_name = re.search(r"(?:Cadet|Name)\s*[:/]?\s*([A-Za-z\s\.]+?)(?:,|\s+Son|\s+Daughter|\s+of|\n)", text, re.IGNORECASE)
+        if m_name:
+            val = re.sub(r'[^a-zA-Z\s\.]', '', m_name.group(1)).strip()
+            if len(val) >= 2:
+                result["name"] = val
+        if not result.get("name"):
+            m_name2 = re.search(r"certify\s+that\s+([A-Za-z\s\.]+?)(?:,|\s+has|\s+Son|\n)", text, re.IGNORECASE)
+            if m_name2:
+                val = re.sub(r'[^a-zA-Z\s\.]', '', m_name2.group(1)).strip()
+                if len(val) >= 2:
+                    result["name"] = val
+
+        # 2. Certificate No
+        m_cert = re.search(r"Certificate\s*(?:No|Number|Sl\s*No)\s*[:/]?\s*([A-Za-z0-9\-/]+)", text, re.IGNORECASE)
+        if m_cert:
+            result["certificate_no"] = m_cert.group(1).strip()
+
+        # 3. Unit / Battalion
+        m_unit = re.search(r"Unit\s*[:/]?\s*([^\n,]+)", text, re.IGNORECASE)
+        if m_unit:
+            result["unit"] = m_unit.group(1).strip()
+
+        # 4. Certificate Grade
+        m_grade = re.search(r"('(?:A|B|C)'\s*Certificate|Certificate\s*['\"]?(?:A|B|C)['\"]?)", text, re.IGNORECASE)
+        if m_grade:
+            result["cert_type"] = m_grade.group(1).strip()
+
+        result["ncc_status"] = "Eligible NCC Cadet"
+        return result
+
+    def _parse_nss(self, text: str) -> dict:
+        result = {}
+        # 1. Volunteer Name
+        m_name = re.search(r"certify\s+that\s+([A-Za-z\s\.]+?)(?:,|\s+of|\s+has|\n)", text, re.IGNORECASE)
+        if m_name:
+            val = re.sub(r'[^a-zA-Z\s\.]', '', m_name.group(1)).strip()
+            if len(val) >= 2:
+                result["name"] = val
+        if not result.get("name"):
+            m_name2 = re.search(r"(?:Volunteer\s+Name|Name)\s*[:/]?\s*([A-Za-z\s\.]+)", text, re.IGNORECASE)
+            if m_name2:
+                val = re.sub(r'[^a-zA-Z\s\.]', '', m_name2.group(1)).strip()
+                if len(val) >= 2:
+                    result["name"] = val
+
+        # 2. Certificate No
+        m_cert = re.search(r"Certificate\s*(?:No|Number|Sl\s*No)\s*[:/]?\s*([A-Za-z0-9\-/]+)", text, re.IGNORECASE)
+        if m_cert:
+            result["certificate_no"] = m_cert.group(1).strip()
+
+        # 3. College
+        m_col = re.search(r"(?:College|Institution)\s*[:/]?\s*([^\n,]+)", text, re.IGNORECASE)
+        if m_col:
+            result["college"] = m_col.group(1).strip()
+
+        result["nss_status"] = "Eligible NSS Volunteer"
+        return result
+
+    def _parse_minority(self, text: str) -> dict:
+        result = {}
+        # 1. Applicant Name
+        m_name = re.search(r"certify\s+that\s+([A-Za-z\s\.]+?)(?:,|\s+Son|\s+Daughter|\s+resident|\n)", text, re.IGNORECASE)
+        if m_name:
+            val = re.sub(r'[^a-zA-Z\s\.]', '', m_name.group(1)).strip()
+            if len(val) >= 2:
+                result["name"] = val
+        if not result.get("name"):
+            m_name2 = re.search(r"(?:Applicant\s+Name|Name)\s*[:/]?\s*([A-Za-z\s\.]+)", text, re.IGNORECASE)
+            if m_name2:
+                val = re.sub(r'[^a-zA-Z\s\.]', '', m_name2.group(1)).strip()
+                if len(val) >= 2:
+                    result["name"] = val
+
+        # 2. Certificate No
+        m_cert = re.search(r"Certificate\s*(?:No|Number)\s*[:/]?\s*([A-Za-z0-9\-/]+)", text, re.IGNORECASE)
+        if m_cert:
+            result["certificate_no"] = m_cert.group(1).strip()
+
+        # 3. Minority community / religion
+        m_rel = re.search(r"(Muslim|Christian|Sikh|Buddhist|Jain|Parsi|Linguistic)", text, re.IGNORECASE)
+        if m_rel:
+            result["minority_category"] = m_rel.group(1).strip()
+
+        result["minority_status"] = "Verified Minority"
         return result
 
     def _parse_aadhaar(self, text: str) -> dict:
@@ -950,6 +1121,49 @@ class OCRAgent:
                 "certificate_no": extracted.get("certificate_no"),
                 "date": extracted.get("date"),
                 "disability_status": extracted.get("disability_status", "Verified PwD")
+            }
+        elif document_type in ("sportsQuota", "sports"):
+            complete_data = {
+                "document_type": "sportsQuota",
+                "name": extracted.get("name"),
+                "sport_name": extracted.get("sport_name"),
+                "competition_level": extracted.get("competition_level"),
+                "achievement": extracted.get("achievement"),
+                "certificate_no": extracted.get("certificate_no"),
+                "sports_status": extracted.get("sports_status", "Eligible Sports Quota")
+            }
+        elif document_type == "firstGraduate":
+            complete_data = {
+                "document_type": "firstGraduate",
+                "name": extracted.get("name"),
+                "certificate_no": extracted.get("certificate_no"),
+                "district": extracted.get("district"),
+                "first_graduate_status": extracted.get("first_graduate_status", "Verified First Graduate")
+            }
+        elif document_type == "ncc":
+            complete_data = {
+                "document_type": "ncc",
+                "name": extracted.get("name"),
+                "certificate_no": extracted.get("certificate_no"),
+                "unit": extracted.get("unit"),
+                "cert_type": extracted.get("cert_type"),
+                "ncc_status": extracted.get("ncc_status", "Eligible NCC Cadet")
+            }
+        elif document_type == "nss":
+            complete_data = {
+                "document_type": "nss",
+                "name": extracted.get("name"),
+                "certificate_no": extracted.get("certificate_no"),
+                "college": extracted.get("college"),
+                "nss_status": extracted.get("nss_status", "Eligible NSS Volunteer")
+            }
+        elif document_type == "minority":
+            complete_data = {
+                "document_type": "minority",
+                "name": extracted.get("name"),
+                "certificate_no": extracted.get("certificate_no"),
+                "minority_category": extracted.get("minority_category"),
+                "minority_status": extracted.get("minority_status", "Verified Minority")
             }
 
         if extracted.get("classification_warning"):

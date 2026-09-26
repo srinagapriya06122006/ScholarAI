@@ -36,6 +36,28 @@ class DocumentClassificationAgent:
                 "medical board", "rights of persons with disabilities",
                 "udid", "locomotor disability", "permanent disability assessment",
                 "benchmark disability"
+            ],
+            "sportsQuota": [
+                "sports development authority", "sports certificate", "merit certificate",
+                "sports quota", "national championship", "state championship",
+                "inter-university", "gold medalist", "athletics", "tournament"
+            ],
+            "firstGraduate": [
+                "first graduate certificate", "first generation graduate",
+                "no graduate in family", "tahsildar", "first graduate",
+                "first-graduate", "degree in family"
+            ],
+            "ncc": [
+                "national cadet corps", "ncc", "directorate general ncc",
+                "cadet", "c certificate", "b certificate", "battalion", "suo"
+            ],
+            "nss": [
+                "national service scheme", "nss", "special camping programme",
+                "nss volunteer", "nss merit certificate", "240 hours"
+            ],
+            "minority": [
+                "minority certificate", "religious minority", "linguistic minority",
+                "minority community", "national commission for minorities"
             ]
         }
 
