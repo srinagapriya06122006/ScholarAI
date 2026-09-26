@@ -1078,7 +1078,13 @@ export const AdminDashboard = () => {
                             {doc.file_path && (
                               <button
                                 type="button"
-                                onClick={() => setPreviewDoc({ url: `http://localhost:8000${doc.file_path}`, filename: doc.filename, type: doc.document_type })}
+                                onClick={() => setPreviewDoc({
+                                  url: `http://localhost:8000${doc.file_path}`,
+                                  filename: doc.filename,
+                                  type: doc.document_type,
+                                  studentName: selectedApp.student?.fullName || 'Applicant',
+                                  appId: selectedApp.id
+                                })}
                                 className="px-2.5 py-1 rounded-lg text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 transition-colors flex items-center gap-1 font-semibold cursor-pointer"
                                 title="Open Document Preview"
                               >
@@ -1271,10 +1277,17 @@ export const AdminDashboard = () => {
               <div className="flex items-center gap-2">
                 <FileSearch className="w-5 h-5 text-indigo-500" />
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white capitalize">
-                    {previewDoc.type} Certificate Preview
-                  </h4>
-                  <p className="text-[11px] text-slate-400">{previewDoc.filename}</p>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white capitalize">
+                      {previewDoc.type} Certificate Preview
+                    </h4>
+                    {previewDoc.studentName && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                        {previewDoc.studentName} {previewDoc.appId ? `(#${previewDoc.appId})` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">{previewDoc.filename}</p>
                 </div>
               </div>
 
