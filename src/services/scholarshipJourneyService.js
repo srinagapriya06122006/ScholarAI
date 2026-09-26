@@ -224,11 +224,28 @@ export const calculateJourneyState = ({
   const isProfileComplete = profileCompletion >= 80 && completedFields.length >= 7;
 
   // 2. Documents Evaluation
+  const normalizeDocKey = (k) => {
+    if (!k) return '';
+    const s = String(k).toLowerCase().replace(/[_\-\s]/g, '');
+    if (s === 'sports' || s === 'sportsquota') return 'sportsquota';
+    if (s === 'firstgraduate' || s === 'firstgrad') return 'firstgraduate';
+    if (s === 'disability' || s === 'pwd' || s === 'physicallychallenged') return 'disability';
+    if (s === 'college' || s === 'bonafide' || s === 'collegeid') return 'college';
+    if (s === 'tenth' || s === '10th' || s === 'tenthmarksheet') return 'tenth';
+    if (s === 'twelfth' || s === '12th' || s === 'twelfthmarksheet') return 'twelfth';
+    return s;
+  };
+
   const docsList = Array.isArray(documents) ? documents : [];
   const docsByType = {};
   docsList.forEach(d => {
     if (d && d.document_type) {
-      docsByType[d.document_type.toLowerCase()] = d;
+      const raw = String(d.document_type);
+      const lower = raw.toLowerCase();
+      const norm = normalizeDocKey(raw);
+      docsByType[raw] = d;
+      docsByType[lower] = d;
+      docsByType[norm] = d;
     }
   });
 
@@ -240,34 +257,52 @@ export const calculateJourneyState = ({
   if (profile?.category && !['general', 'oc', 'open', 'all'].includes(String(profile.category).toLowerCase())) {
     requiredDocTypes.push('community');
   }
-  if (profile?.disability) {
-    requiredDocTypes.push('disability');
-  }
-  if (profile?.sportsQuota) {
-    requiredDocTypes.push('sportsQuota');
-  }
-  if (profile?.firstGraduate) {
-    requiredDocTypes.push('firstGraduate');
-  }
-  if (profile?.ncc) {
-    requiredDocTypes.push('ncc');
-  }
-  if (profile?.nss) {
-    requiredDocTypes.push('nss');
-  }
-  if (profile?.minority) {
-    requiredDocTypes.push('minority');
-  }
+  const hasDisability = Boolean(
+    profile?.disability === true ||
+    String(profile?.disability).toLowerCase() === 'yes' ||
+    profile?.physicallyChallenged === true ||
+    String(profile?.physicallyChallenged).toLowerCase() === 'yes'
+  );
+  const hasSportsQuota = Boolean(
+    profile?.sportsQuota === true ||
+    String(profile?.sportsQuota).toLowerCase() === 'yes'
+  );
+  const hasFirstGraduate = Boolean(
+    profile?.firstGraduate === true ||
+    String(profile?.firstGraduate).toLowerCase() === 'yes'
+  );
+  const hasNcc = Boolean(
+    profile?.ncc === true ||
+    String(profile?.ncc).toLowerCase() === 'yes'
+  );
+  const hasNss = Boolean(
+    profile?.nss === true ||
+    String(profile?.nss).toLowerCase() === 'yes'
+  );
+  const hasMinority = Boolean(
+    profile?.minority === true ||
+    String(profile?.minority).toLowerCase() === 'yes'
+  );
+
+  if (hasDisability) requiredDocTypes.push('disability');
+  if (hasSportsQuota) requiredDocTypes.push('sportsQuota');
+  if (hasFirstGraduate) requiredDocTypes.push('firstGraduate');
+  if (hasNcc) requiredDocTypes.push('ncc');
+  if (hasNss) requiredDocTypes.push('nss');
+  if (hasMinority) requiredDocTypes.push('minority');
 
   const requiredDocuments = requiredDocTypes.map(type => {
-    const def = MANDATORY_DOC_DEFINITIONS.find(d => d.type === type) || {
+    const def = MANDATORY_DOC_DEFINITIONS.find(d => d.type === type || normalizeDocKey(d.type) === normalizeDocKey(type)) || {
       type,
       name: `${type.toUpperCase()} Certificate`,
       reason: 'Required for scholarship verification.',
       howToObtain: 'Obtain from your official educational institution or government portal.'
     };
 
-    const uploadedDoc = docsByType[type];
+    const uploadedDoc =
+      docsByType[type] ||
+      docsByType[type.toLowerCase()] ||
+      docsByType[normalizeDocKey(type)];
     let status = 'Missing';
     let isVerified = false;
 
