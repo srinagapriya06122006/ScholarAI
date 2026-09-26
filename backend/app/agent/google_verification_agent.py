@@ -545,10 +545,13 @@ class GoogleScholarshipVerificationAgent:
         # ─────────────────────────────────────────────────────────────
         queries = []
 
-        # Deadline year extraction
+        # Deadline year extraction - always use current academic cycle 2026
         import re as _re
         deadline_year_m = _re.search(r"(20\d{2})", db_deadline)
-        search_year = deadline_year_m.group(1) if deadline_year_m else "2025"
+        if deadline_year_m and int(deadline_year_m.group(1)) >= 2026:
+            search_year = deadline_year_m.group(1)
+        else:
+            search_year = "2026"
 
         # Query 1: Initial broad search with name + provider
         q1 = f'"{sch_name}"'
@@ -565,21 +568,35 @@ class GoogleScholarshipVerificationAgent:
         q2_parts.append(f"eligibility {search_year}")
         queries.append({"type": "academic_income", "label": "TARGETED INCOME & MARKS SEARCH", "query": " ".join(q2_parts)})
 
-        # Query 3: Community / Category / State (dynamic, only if specific)
+        # Query 3: Community / Category / State (dynamic, only if specific and not duplicated)
         q3_parts = [f'"{sch_name}"']
         added_q3 = False
+        seen_criteria = set()
+
         if not is_skip(db_category) and db_category not in ["All", "Any"]:
-            q3_parts.append(f"{db_category} category")
+            cat_clean = db_category.strip()
+            q3_parts.append(f"{cat_clean} category")
+            seen_criteria.add(cat_clean.lower())
             added_q3 = True
-        if not is_skip(db_religion):
-            q3_parts.append(db_religion)
+
+        if not is_skip(db_religion) and db_religion.strip().lower() not in seen_criteria:
+            rel_clean = db_religion.strip()
+            q3_parts.append(rel_clean)
+            seen_criteria.add(rel_clean.lower())
             added_q3 = True
+
         if not is_skip(db_state) and db_state not in ["All India", "National", "All"]:
-            q3_parts.append(f"{db_state} domicile criteria")
+            st_clean = db_state.strip()
+            q3_parts.append(f"{st_clean} domicile criteria")
+            seen_criteria.add(st_clean.lower())
             added_q3 = True
-        if not is_skip(db_sch_type):
-            q3_parts.append(db_sch_type)
+
+        if not is_skip(db_sch_type) and db_sch_type.strip().lower() not in seen_criteria:
+            type_clean = db_sch_type.strip()
+            q3_parts.append(type_clean)
+            seen_criteria.add(type_clean.lower())
             added_q3 = True
+
         if added_q3:
             q3_parts.append(search_year)
             queries.append({"type": "category_state", "label": "COMMUNITY & DOMICILE SEARCH", "query": " ".join(q3_parts)})

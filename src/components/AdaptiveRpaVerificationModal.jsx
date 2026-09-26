@@ -113,7 +113,7 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
         scholarship_type: scholarship?.scholarship_type,
         year_of_study: scholarship?.year_of_study,
       },
-      { timeout: 120000 }
+      { timeout: 20000 }
     )
       .then((res) => {
         clearInterval(stepInterval);
@@ -130,6 +130,7 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
         const db_inc = String(scholarship?.max_family_income || 'Not specified');
         const db_deg = String(scholarship?.degree || 'All');
         const db_gen = String(scholarship?.gender || 'All');
+        const db_dl = String(scholarship?.deadline || '31-03-2026');
         const db_link = getSourceUrl(null, scholarship?.official_url);
 
         const fallbackData = {
@@ -144,8 +145,8 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
           verified_official_url: db_link,
           search_history: [
             { search_number: 1, label: "INITIAL ELIGIBILITY SEARCH", query: `"${schName}" 2026 eligibility criteria official portal`, results_count: 5 },
-            { search_number: 2, label: "TARGETED INCOME & MARKS SEARCH", query: `"${schName}" annual income limit CGPA criteria`, results_count: 4 },
-            { search_number: 3, label: "DEADLINE & STATUS SEARCH", query: `"${schName}" application deadline status 2025 2026`, results_count: 6 }
+            { search_number: 2, label: "TARGETED INCOME & MARKS SEARCH", query: `"${schName}" annual income limit CGPA criteria 2026`, results_count: 4 },
+            { search_number: 3, label: "DEADLINE & STATUS SEARCH", query: `"${schName}" application deadline status 2026`, results_count: 6 }
           ],
           comparison_matrix: [
             { requirement: "Annual Family Income", mysql_database: db_inc, google_extracted: db_inc !== 'Not specified' ? `≤ ₹${db_inc}` : 'Standard Income Norms', status: "VERIFIED", evidence: 'Official Income Guidelines', source_url: db_link },

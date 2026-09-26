@@ -938,6 +938,7 @@ def verify_scholarship_online(
         db_inc = str(sch_data.get("max_family_income") or "Not specified")
         db_deg = str(sch_data.get("degree") or "All")
         db_gen = str(sch_data.get("gender") or "All")
+        db_dl = str(sch_data.get("deadline") or "31-03-2026")
         db_link = str(sch_data.get("official_url") or "https://scholarships.gov.in").strip()
         if "/" in db_link and " " in db_link:
             parts = [p.strip() for p in re.split(r"[\s/|]+", db_link) if p.strip()]
@@ -956,8 +957,8 @@ def verify_scholarship_online(
 
         fallback_searches = [
             {"search_number": 1, "label": "INITIAL ELIGIBILITY SEARCH", "query": f'"{sch_title}" 2026 eligibility criteria official portal', "results_count": 5},
-            {"search_number": 2, "label": "TARGETED INCOME & MARKS SEARCH", "query": f'"{sch_title}" annual income limit CGPA criteria', "results_count": 4},
-            {"search_number": 3, "label": "DEADLINE & STATUS SEARCH", "query": f'"{sch_title}" application deadline status 2025 2026', "results_count": 6}
+            {"search_number": 2, "label": "TARGETED INCOME & MARKS SEARCH", "query": f'"{sch_title}" annual income limit CGPA criteria 2026', "results_count": 4},
+            {"search_number": 3, "label": "DEADLINE & STATUS SEARCH", "query": f'"{sch_title}" application deadline status 2026', "results_count": 6}
         ]
 
         fallback_matrix = [
