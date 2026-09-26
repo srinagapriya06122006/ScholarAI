@@ -8,7 +8,7 @@ from .. import models, crud
 from .profile_agent import ProfileAgent
 from .matching_agent import ScholarshipMatchingAgent
 from .document_agent import RequiredDocumentAgent
-from .ocr_agent import OCRAgent
+from .ocr_agent import OCRAgent, correct_ocr_name
 from .verification_agent import VerificationAgent
 from .recommendation_agent import AIRecommendationAgent
 from .document_collector_agent import DocumentCollectorAgent, WORKFLOW_STATES
@@ -261,13 +261,17 @@ class SupervisorAgent:
 
         # Ensure all extracted document data is synchronized into OCRData model
         ocr_model = crud.get_ocr_data(self.db, context.user_id)
+        user = crud.get_user(self.db, context.user_id)
+        profile_name = user.fullName if user else None
         for doc in documents:
             if doc.extracted_data:
                 try:
                     data = json.loads(doc.extracted_data)
                     fields = data.get("extracted_fields") or data
-                    if fields.get("name") and not ocr_model.name:
-                        ocr_model.name = fields.get("name")
+                    if fields.get("name"):
+                        clean_name = correct_ocr_name(fields.get("name"), profile_name)
+                        if doc.document_type == "aadhaar" or not ocr_model.name or ocr_model.name != clean_name:
+                            ocr_model.name = clean_name
                     if fields.get("gender") and not ocr_model.gender:
                         ocr_model.gender = fields.get("gender")
                     if fields.get("state") and not ocr_model.state:
@@ -513,13 +517,16 @@ class SupervisorAgent:
             }
 
         # Enrich ocr_dict with any fields present in uploaded documents' extracted_data
+        # Prioritize primary identity documents (aadhaar first) for name, gender, and state
         documents = crud.get_user_documents(self.db, context.user_id)
-        for doc in documents:
+        doc_priority = {"aadhaar": 1, "tenth": 2, "twelfth": 3, "college": 4, "income": 5, "community": 6, "disability": 7}
+        sorted_docs = sorted(documents, key=lambda d: doc_priority.get(d.document_type.lower(), 99))
+        for doc in sorted_docs:
             if doc.extracted_data:
                 try:
                     data = json.loads(doc.extracted_data)
                     fields = data.get("extracted_fields") or data
-                    if not ocr_dict.get("name") and fields.get("name"):
+                    if (not ocr_dict.get("name") or doc.document_type.lower() == "aadhaar") and fields.get("name"):
                         ocr_dict["name"] = fields.get("name")
                         ocr_model.name = fields.get("name")
                     if not ocr_dict.get("gender") and fields.get("gender"):

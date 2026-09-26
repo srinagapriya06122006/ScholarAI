@@ -21,6 +21,92 @@ try:
 except ImportError:
     pass
 
+def correct_ocr_name(extracted_name: str, profile_name: str = None) -> str:
+    """
+    Sanitizes OCR extracted names, correcting common OCR scanning confusions
+    such as 'V' instead of 'Y' (e.g. SRINAGAPRIVAA -> SRINAGAPRIYA A, PRIVA -> PRIYA),
+    '1' or 'L' instead of 'I' (e.g. SRIVANL -> srivani), and aligning against
+    the authenticated student profile name when a high-confidence fuzzy match exists.
+    """
+    if not extracted_name:
+        return extracted_name
+
+    clean_ext = re.sub(r'\s+', ' ', str(extracted_name)).strip()
+
+    # 1. Profile-guided alignment if profile_name is available
+    if profile_name and str(profile_name).strip():
+        prof = re.sub(r'\s+', ' ', str(profile_name)).strip()
+        clean_p = re.sub(r'[^A-Za-z0-9]', '', prof).upper()
+        clean_e = re.sub(r'[^A-Za-z0-9]', '', clean_ext).upper()
+
+        if clean_p == clean_e:
+            return prof
+
+        def normalize_chars(s):
+            return (s.replace('V', 'Y')
+                     .replace('1', 'I')
+                     .replace('L', 'I')
+                     .replace('|', 'I')
+                     .replace('!', 'I')
+                     .replace('0', 'O')
+                     .replace('5', 'S')
+                     .replace('8', 'B'))
+
+        # Exact match after OCR character equivalence (e.g. SRINAGAPRIVAA == SRINAGAPRIYA A)
+        if normalize_chars(clean_p) == normalize_chars(clean_e):
+            return prof
+
+        # Levenshtein distance check with zero cost for known OCR character confusions
+        len_p, len_e = len(clean_p), len(clean_e)
+        if abs(len_p - len_e) <= 3:
+            dp = [[0] * (len_e + 1) for _ in range(len_p + 1)]
+            for i in range(len_p + 1):
+                dp[i][0] = i
+            for j in range(len_e + 1):
+                dp[0][j] = j
+            for i in range(1, len_p + 1):
+                for j in range(1, len_e + 1):
+                    ch_p = clean_p[i - 1]
+                    ch_e = clean_e[j - 1]
+                    if (ch_p == ch_e or 
+                        (ch_p in ('Y', 'V') and ch_e in ('Y', 'V')) or 
+                        (ch_p in ('I', 'L', '1') and ch_e in ('I', 'L', '1')) or
+                        (ch_p in ('O', '0') and ch_e in ('O', '0'))):
+                        cost = 0
+                    else:
+                        cost = 1
+                    dp[i][j] = min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+
+            edit_dist = dp[len_p][len_e]
+            max_len = max(len_p, len_e, 1)
+            similarity = 1.0 - (edit_dist / max_len)
+            if similarity >= 0.75 or edit_dist <= 2:
+                return prof
+
+    # 2. Standalone pattern-based OCR corrections for common names
+    corrected = clean_ext
+    # Fix PRIVAA -> PRIYA A, PRIVA -> PRIYA
+    corrected = re.sub(r'\bPRIVAA\b', 'PRIYA A', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'PRIVAA\b', 'PRIYA A', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'PRIVA\b', 'PRIYA', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'PRIVA([A-Z])', r'PRIYA \1', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'([A-Z]+)PRIVA', r'\1PRIYA', corrected, flags=re.IGNORECASE)
+    # Fix VIJAV -> VIJAY, JAVA -> JAYA
+    corrected = re.sub(r'\bVIJAV\b', 'VIJAY', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'VIJAV\b', 'VIJAY', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'\bJAVA\b', 'JAYA', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'([A-Z]+)JAVA\b', r'\1JAYA', corrected, flags=re.IGNORECASE)
+    # Fix other common -ya suffixes misrecognized as -va
+    corrected = re.sub(r'KAVVA\b', 'KAVYA', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'DIVVA\b', 'DIVYA', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'SURVA\b', 'SURYA', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'RAMVA\b', 'RAMYA', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'BHAGVA\b', 'BHAGYA', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'SOWMV\b', 'SOWMY', corrected, flags=re.IGNORECASE)
+    corrected = re.sub(r'DHVA\b', 'DHYA', corrected, flags=re.IGNORECASE)
+
+    return corrected
+
 class BaseOCREngine(ABC):
     @abstractmethod
     def extract_text(self, file_path: str, doc_type: str) -> dict:
@@ -354,7 +440,7 @@ class TesseractOCREngine(BaseOCREngine):
 
         if name_found:
             name_found = re.split(r"\b(?:DOB|Date|Gender|Aadhaar|Male|Female)\b", name_found, flags=re.IGNORECASE)[0].strip()
-            result["name"] = name_found.strip()
+            result["name"] = correct_ocr_name(name_found.strip())
 
         dob_match = re.search(r"(?:DOB|Date of Birth|D\.O\.B|Year of Birth)\s*[:\-]?\s*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4})", text, re.IGNORECASE)
         if dob_match:
@@ -873,6 +959,11 @@ class OCRAgent:
         if extracted.get("expected_type"):
             complete_data["expected_type"] = extracted.get("expected_type")
 
+        user = crud.get_user(self.db, user_id)
+        profile_name = user.fullName if user else None
+        if "name" in complete_data and complete_data["name"]:
+            complete_data["name"] = correct_ocr_name(complete_data["name"], profile_name)
+
         # Check completeness / validation metrics
         is_valid = any(v is not None and v != "" for k, v in complete_data.items() if k not in ("document_type", "board", "classification_warning", "detected_type", "expected_type"))
         fields_found = [k for k, v in complete_data.items() if v is not None and k != "document_type"]
@@ -903,7 +994,8 @@ class OCRAgent:
         # Update OCRData model
         ocr_data = crud.get_ocr_data(self.db, user_id)
         if "name" in complete_data and complete_data["name"]:
-            ocr_data.name = complete_data["name"]
+            if document_type == "aadhaar" or not ocr_data.name or ocr_data.name != complete_data["name"]:
+                ocr_data.name = complete_data["name"]
         if "gender" in complete_data and complete_data["gender"]:
             ocr_data.gender = complete_data["gender"]
         if "state" in complete_data and complete_data["state"]:

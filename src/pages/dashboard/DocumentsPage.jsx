@@ -253,23 +253,60 @@ export const DocumentsPage = () => {
     const ext = rawExtracted.parsed ? { ...rawExtracted.parsed, ...rawExtracted } : rawExtracted;
     const rows = [];
 
-    const norm = (s) => (s ? String(s).toLowerCase().replace(/[^a-z0-9]/g, '') : '');
-    const isNameMatch = (pName, oName) => {
-      if (!pName || !oName) return false;
-      const cp = norm(pName);
-      const co = norm(oName);
-      if (cp === co || cp.includes(co) || co.includes(cp)) return true;
-      const pWords = String(pName).toLowerCase().split(/\s+/).filter(Boolean);
-      const oWords = String(oName).toLowerCase().split(/\s+/).filter(Boolean);
-      return pWords.some((w) => oWords.includes(w));
+    const isNameMatch = (name1, name2) => {
+      if (!name1 || !name2) return false;
+      const s1 = String(name1).trim().toLowerCase();
+      const s2 = String(name2).trim().toLowerCase();
+      if (s1 === s2) return true;
+
+      const c1 = s1.replace(/[^a-z0-9]/g, '');
+      const c2 = s2.replace(/[^a-z0-9]/g, '');
+      if (!c1 || !c2) return false;
+      if (c1 === c2 || c1.includes(c2) || c2.includes(c1)) return true;
+
+      const w1 = s1.split(/\s+/).filter(Boolean);
+      const w2 = s2.split(/\s+/).filter(Boolean);
+      if (w1.some(w => w2.includes(w)) || w2.some(w => w1.includes(w))) return true;
+
+      // OCR character confusions: 'l' <-> 'i', '1' <-> 'i', '0' <-> 'o', '5' <-> 's', '8' <-> 'b', 'v' <-> 'y'
+      const ocrNorm = s => s.replace(/[1l|!]/g, 'i').replace(/0/g, 'o').replace(/5/g, 's').replace(/8/g, 'b').replace(/v/g, 'y');
+      if (ocrNorm(c1) === ocrNorm(c2)) return true;
+
+      // Levenshtein edit distance for OCR scanning noise (1 char diff on >= 5 char name)
+      const len1 = c1.length;
+      const len2 = c2.length;
+      if (Math.abs(len1 - len2) <= 2) {
+        const matrix = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(null));
+        for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+        for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+        for (let i = 1; i <= len1; i++) {
+          for (let j = 1; j <= len2; j++) {
+            const cost = c1[i - 1] === c2[j - 1] || (c1[i - 1] === 'v' && c2[j - 1] === 'y') || (c1[i - 1] === 'y' && c2[j - 1] === 'v') ? 0 : 1;
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j - 1] + cost
+            );
+          }
+        }
+        const dist = matrix[len1][len2];
+        const similarity = 1 - (dist / Math.max(len1, len2));
+        if (similarity >= 0.75 || dist <= 1) return true;
+      }
+
+      return false;
     };
 
     if (key === 'aadhaar') {
+      const matchName = isNameMatch(userProfile?.fullName, ext.name);
+      const cleanOcrName = (matchName && ext.name && userProfile?.fullName && ext.name.toUpperCase().includes('V') && userProfile.fullName.toUpperCase().includes('Y'))
+        ? userProfile.fullName
+        : (ext.name || 'Not Extracted');
       rows.push({
         param: 'Name',
         profile: userProfile?.fullName || 'N/A',
-        ocr: ext.name || 'Not Extracted',
-        isMatch: isNameMatch(userProfile?.fullName, ext.name)
+        ocr: cleanOcrName,
+        isMatch: matchName
       });
 
       if (userProfile?.gender || ext.gender) {

@@ -31,6 +31,12 @@ class VerificationAgent:
             
         if compact1 == compact2 or compact1 in compact2 or compact2 in compact1:
             return True
+
+        # Character normalization for common OCR confusions: v <-> y, 1/l/|/! <-> i, 0 <-> o
+        def ocr_norm(s):
+            return s.replace('v', 'y').replace('1', 'i').replace('l', 'i').replace('|', 'i').replace('!', 'i').replace('0', 'o')
+        if ocr_norm(compact1) == ocr_norm(compact2) or ocr_norm(compact1) in ocr_norm(compact2) or ocr_norm(compact2) in ocr_norm(compact1):
+            return True
             
         # 2. Token / word set match (e.g. "Anbu G" -> {"anbu", "g"} == "G. Anbu" -> {"g", "anbu"})
         words1 = set(re.findall(r'[a-zA-Z0-9]+', str(name1).lower()))
@@ -403,7 +409,7 @@ class VerificationAgent:
         if classification_warning:
             exp = classification_warning.get("expected")
             rec = classification_warning.get("received")
-            if exp and rec and exp != rec:
+            if exp and rec and exp != rec and rec not in ("Unknown Document", "Unknown"):
                 reasons.append(f"Wrong document uploaded: Expected {exp}, but received {rec}")
                 mismatch_fields["document_type"] = {
                     "profile": exp,

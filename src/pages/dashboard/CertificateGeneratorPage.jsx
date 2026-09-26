@@ -885,7 +885,7 @@ export const CertificateGeneratorPage = () => {
                     <div className="col-span-8 text-[11px] flex flex-col gap-1">
                       <div>
                         <span className="font-bold text-slate-500 text-[9px] block">नाम / Name</span>
-                        <span className="font-bold text-slate-800">{fields.aadhaar.name || 'Madhi'}</span>
+                        <span className="font-extrabold text-slate-900 tracking-wider text-xs uppercase">{fields.aadhaar.name || 'Madhi'}</span>
                       </div>
                       <div>
                         <span className="font-bold text-slate-500 text-[9px] block">जन्म तिथि / DOB</span>
@@ -1212,7 +1212,7 @@ export const CertificateGeneratorPage = () => {
                     {/* Right: Personal & Clinical Info */}
                     <div className="col-span-8 text-[11px] flex flex-col gap-1.5 leading-snug">
                       <p>
-                        This is to certify that we have carefully examined <strong className="text-slate-900 uppercase underline">{fields.disability.name || 'APPLICANT NAME'}</strong>,
+                        This is to certify that we have carefully examined <strong className="text-slate-900 uppercase font-black tracking-wide">{fields.disability.name || 'APPLICANT NAME'}</strong>,
                         Son / Daughter of <strong className="text-slate-900">{fields.disability.father_name}</strong>.
                       </p>
                       <div className="grid grid-cols-2 gap-1 text-[10px] bg-slate-50 p-2 rounded border border-slate-200">
