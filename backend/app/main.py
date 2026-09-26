@@ -938,8 +938,21 @@ def verify_scholarship_online(
         db_inc = str(sch_data.get("max_family_income") or "Not specified")
         db_deg = str(sch_data.get("degree") or "All")
         db_gen = str(sch_data.get("gender") or "All")
-        db_dl = str(sch_data.get("deadline") or "31st October / 31st December")
-        db_link = sch_data.get("official_url") or "https://scholarships.gov.in"
+        db_link = str(sch_data.get("official_url") or "https://scholarships.gov.in").strip()
+        if "/" in db_link and " " in db_link:
+            parts = [p.strip() for p in re.split(r"[\s/|]+", db_link) if p.strip()]
+            db_link = parts[-1] if parts else "https://scholarships.gov.in"
+        for bad_d, good_u in [
+            ("tnscholarship.tn.gov.in", "https://www.tnesevai.tn.gov.in"),
+            ("tnscholarships.gov.in", "https://www.tnesevai.tn.gov.in"),
+            ("tndte.gov.in", "https://www.tnesevai.tn.gov.in"),
+            ("maef.nic.in", "https://scholarships.gov.in")
+        ]:
+            if bad_d in db_link.lower():
+                db_link = good_u
+                break
+        if not db_link.startswith("http"):
+            db_link = f"https://{db_link}"
 
         fallback_searches = [
             {"search_number": 1, "label": "INITIAL ELIGIBILITY SEARCH", "query": f'"{sch_title}" 2026 eligibility criteria official portal', "results_count": 5},

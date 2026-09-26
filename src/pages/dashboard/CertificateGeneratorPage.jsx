@@ -347,6 +347,13 @@ export const CertificateGeneratorPage = () => {
     });
   };
 
+  const hasDisability = Boolean(
+    profile?.disability === true ||
+    String(profile?.disability).toLowerCase() === 'yes' ||
+    profile?.physicallyChallenged === true ||
+    String(profile?.physicallyChallenged).toLowerCase() === 'yes'
+  );
+
   const documentsMap = {
     aadhaar: 'Aadhaar Card',
     income: 'Income Certificate',
@@ -354,7 +361,7 @@ export const CertificateGeneratorPage = () => {
     community: 'Community Certificate',
     tenth: '10th Marksheet',
     twelfth: '12th Marksheet',
-    disability: 'Disability Certificate'
+    disability: hasDisability ? 'Disability Certificate (Required for PwD)' : 'Disability Certificate (Not Needed)'
   };
 
   return (

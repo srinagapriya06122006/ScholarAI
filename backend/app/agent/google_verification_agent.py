@@ -606,8 +606,24 @@ class GoogleScholarshipVerificationAgent:
             official_source = all_sources[0]
 
         source_link = official_source.get("link", db_url) if official_source else db_url
-        if source_link and not source_link.startswith("http"):
-            source_link = f"https://{source_link}"
+        if source_link:
+            source_link = str(source_link).strip()
+            if "/" in source_link and " " in source_link:
+                parts = [p.strip() for p in re.split(r"[\s/|]+", source_link) if p.strip()]
+                source_link = parts[-1] if parts else "https://scholarships.gov.in"
+            for bad_d, good_u in [
+                ("tnscholarship.tn.gov.in", "https://www.tnesevai.tn.gov.in"),
+                ("tnscholarships.gov.in", "https://www.tnesevai.tn.gov.in"),
+                ("tndte.gov.in", "https://www.tnesevai.tn.gov.in"),
+                ("maef.nic.in", "https://scholarships.gov.in")
+            ]:
+                if bad_d in source_link.lower():
+                    source_link = good_u
+                    break
+            if not source_link.startswith("http"):
+                source_link = f"https://{source_link}"
+        else:
+            source_link = "https://scholarships.gov.in"
         evidence_str = "Official Portal Guidelines"
 
         # ─────────────────────────────────────────────────────────────

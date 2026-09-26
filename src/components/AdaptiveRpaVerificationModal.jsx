@@ -20,6 +20,13 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 
+const KNOWN_PORTAL_MAPPINGS = {
+  'tnscholarship.tn.gov.in': 'https://www.tnesevai.tn.gov.in',
+  'tnscholarships.gov.in': 'https://www.tnesevai.tn.gov.in',
+  'tndte.gov.in': 'https://www.tnesevai.tn.gov.in',
+  'maef.nic.in': 'https://scholarships.gov.in'
+};
+
 const cleanEvidenceText = (text) => {
   if (!text) return 'Official Portal Guidelines';
   let cleaned = String(text).replace(/\s*\((?:https?:\/\/)?[\w.-]+(?:\.[\w.-]+)+[^\)]*\)/gi, '').trim();
@@ -28,11 +35,29 @@ const cleanEvidenceText = (text) => {
 };
 
 const getSourceUrl = (row, schUrl) => {
-  let url = row?.source_url || schUrl || 'https://scholarships.gov.in';
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = `https://${url}`;
+  let raw = row?.source_url || schUrl || 'https://scholarships.gov.in';
+  if (!raw) return 'https://scholarships.gov.in';
+
+  let cleaned = String(raw).trim();
+
+  // If compound URL such as "buddy4study.com / tatacapital.com"
+  if (cleaned.includes('/') && cleaned.includes(' ')) {
+    const segments = cleaned.split(/\s*[\/|]\s*/).filter(Boolean);
+    cleaned = segments[segments.length - 1] || segments[0] || 'https://scholarships.gov.in';
   }
-  return url;
+
+  // Check known faulty/outdated domain mappings
+  const lower = cleaned.toLowerCase();
+  for (const [badDomain, validUrl] of Object.entries(KNOWN_PORTAL_MAPPINGS)) {
+    if (lower.includes(badDomain)) {
+      return validUrl;
+    }
+  }
+
+  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    cleaned = `https://${cleaned}`;
+  }
+  return cleaned;
 };
 
 const getDomainName = (url) => {
@@ -105,8 +130,7 @@ export default function AdaptiveRpaVerificationModal({ scholarship, studentProfi
         const db_inc = String(scholarship?.max_family_income || 'Not specified');
         const db_deg = String(scholarship?.degree || 'All');
         const db_gen = String(scholarship?.gender || 'All');
-        const db_dl = String(scholarship?.deadline || '31st October / 31st December');
-        const db_link = scholarship?.official_url || 'https://scholarships.gov.in';
+        const db_link = getSourceUrl(null, scholarship?.official_url);
 
         const fallbackData = {
           scholarship_id: schId,

@@ -126,9 +126,9 @@ PROVIDER_URLS = {
     "nsp": "https://scholarships.gov.in",
     "national scholarship": "https://scholarships.gov.in",
     "sona college": "https://www.sonatech.ac.in",
-    "state": "https://tnscholarships.gov.in",
-    "tamil nadu": "https://tnscholarships.gov.in",
-    "tamilnadu": "https://tnscholarships.gov.in",
+    "state": "https://www.tnesevai.tn.gov.in",
+    "tamil nadu": "https://www.tnesevai.tn.gov.in",
+    "tamilnadu": "https://www.tnesevai.tn.gov.in",
 }
 
 # ─────────────────────────────────────────────

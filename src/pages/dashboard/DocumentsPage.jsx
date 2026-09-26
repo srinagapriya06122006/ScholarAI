@@ -36,7 +36,7 @@ export const DocumentsPage = () => {
     tenth: { name: '10th Marksheet', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
     twelfth: { name: '12th Marksheet', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
     college: { name: 'College ID', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false },
-    disability: { name: 'Disability Certificate (optional)', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false }
+    disability: { name: 'Disability Certificate', uploaded: false, filename: '', previewUrl: '', status: 'Pending', loading: false }
   });
 
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -381,9 +381,16 @@ export const DocumentsPage = () => {
           isMatch: Boolean(matchGen)
         });
       }
+      const hasDisability = Boolean(
+        userProfile?.disability === true ||
+        String(userProfile?.disability).toLowerCase() === 'yes' ||
+        userProfile?.physicallyChallenged === true ||
+        String(userProfile?.physicallyChallenged).toLowerCase() === 'yes'
+      );
+
       rows.push({
         param: 'Disability Assessment',
-        profile: userProfile?.physicallyChallenged ? 'PwD Certified' : 'Eligible for Quota',
+        profile: hasDisability ? 'PwD Certified' : 'Not Declared (Able-Bodied)',
         ocr: ext.percentage ? `${ext.percentage}% Benchmark` : (ext.disability_status || 'Extracted'),
         isMatch: true
       });
@@ -400,9 +407,28 @@ export const DocumentsPage = () => {
     return rows;
   };
 
+  const hasDisability = Boolean(
+    userProfile?.disability === true ||
+    String(userProfile?.disability).toLowerCase() === 'yes' ||
+    userProfile?.physicallyChallenged === true ||
+    String(userProfile?.physicallyChallenged).toLowerCase() === 'yes'
+  );
 
-  // Compute overall document stats
-  const uploadedCount = Object.values(documents).filter((d) => d.uploaded).length;
+  const getDocumentTitle = (key, defaultName) => {
+    if (key === 'disability') {
+      return hasDisability ? 'Disability Certificate (Required)' : 'Disability Certificate (Not Needed)';
+    }
+    return defaultName;
+  };
+
+  // Compute required document stats (disability only required if profile has disability)
+  const requiredDocKeys = ['aadhaar', 'community', 'income', 'tenth', 'twelfth', 'college'];
+  if (hasDisability) {
+    requiredDocKeys.push('disability');
+  }
+
+  const uploadedRequiredCount = requiredDocKeys.filter((k) => documents[k]?.uploaded).length;
+  const totalRequired = requiredDocKeys.length;
   const verifiedCount = Object.values(documents).filter((d) => ['VERIFIED', 'Verified'].includes(d.status)).length;
   const mismatchCount = Object.values(documents).filter((d) => ['MISMATCH', 'Mismatch', 'OCR_FAILED', 'OCR Failed'].includes(d.status)).length;
 
@@ -452,7 +478,7 @@ export const DocumentsPage = () => {
             {/* Quick Status Chips */}
             <div className="flex flex-wrap items-center gap-2 mt-3 text-xs font-semibold">
               <span className="px-3 py-1 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center gap-1.5">
-                <FileCheck2 className="w-3.5 h-3.5" /> Uploaded: <strong>{uploadedCount}/{Object.keys(documents).length}</strong>
+                <FileCheck2 className="w-3.5 h-3.5" /> Uploaded: <strong>{uploadedRequiredCount}/{totalRequired}</strong>
               </span>
               <span className="px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" /> Verified Matches: <strong>{verifiedCount}</strong>
@@ -475,7 +501,7 @@ export const DocumentsPage = () => {
 
             <button
               onClick={triggerVerifyAll}
-              disabled={isVerifyingAll || uploadedCount === 0}
+              disabled={isVerifyingAll || uploadedRequiredCount === 0}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:opacity-95 text-white text-xs font-extrabold transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
             >
               {isVerifyingAll ? (
@@ -502,6 +528,9 @@ export const DocumentsPage = () => {
             const isOcrFailed = statusUpper === 'OCR_FAILED';
             const isVerifying = statusUpper === 'VERIFYING' || statusUpper === 'OCR_PROCESSING';
             const isUploaded = statusUpper === 'UPLOADED' || doc.uploaded;
+            const isDisabilityKey = key === 'disability';
+            const isNotNeeded = isDisabilityKey && !hasDisability && !isUploaded;
+            const docTitle = getDocumentTitle(key, doc.name);
 
             const comparisonRows = doc.uploaded ? getComparisonRows(key, doc) : [];
 
@@ -513,6 +542,10 @@ export const DocumentsPage = () => {
                     ? 'border-emerald-500/40 bg-emerald-500/[0.02] shadow-emerald-500/5'
                     : isMismatch
                     ? 'border-rose-500/40 bg-rose-500/[0.02] shadow-rose-500/5'
+                    : isNotNeeded
+                    ? 'border-slate-700/40 bg-slate-900/30 opacity-75'
+                    : isDisabilityKey && hasDisability && !isUploaded
+                    ? 'border-amber-500/40 bg-amber-500/[0.02]'
                     : 'border-white/20'
                 }`}
               >
@@ -535,19 +568,33 @@ export const DocumentsPage = () => {
                           ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30'
                           : isUploaded
                           ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30'
+                          : isNotNeeded
+                          ? 'bg-slate-500/15 text-slate-400 border border-slate-500/30'
+                          : isDisabilityKey && hasDisability
+                          ? 'bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 font-black'
                           : 'bg-slate-500/20 text-slate-400 border border-slate-500/20'
                       }`}
                     >
                       {isVerifying && <Loader className="w-3 h-3 animate-spin" />}
                       {isVerified && <Check className="w-3 h-3" />}
                       {isMismatch && <X className="w-3 h-3" />}
-                      {doc.status || 'Pending'}
+                      {isNotNeeded
+                        ? 'Not Needed'
+                        : isDisabilityKey && hasDisability && !isUploaded
+                        ? 'Required'
+                        : (doc.status || 'Pending')}
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-850 dark:text-slate-200 mb-1">{doc.name}</h3>
+                  <h3 className="text-base font-bold text-slate-850 dark:text-slate-200 mb-1">{docTitle}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-                    {doc.uploaded ? `File: ${doc.filename}` : `Please upload a high-quality copy of your ${doc.name.toLowerCase()}.`}
+                    {doc.uploaded
+                      ? `File: ${doc.filename}${isDisabilityKey && !hasDisability ? ' (Optional / Not declared in profile)' : ''}`
+                      : isDisabilityKey && hasDisability
+                      ? 'Mandatory requirement for your profile to claim PwD reservation & benefits.'
+                      : isDisabilityKey && !hasDisability
+                      ? 'Not required for your profile (Able-Bodied / No Disability declared).'
+                      : `Please upload a high-quality copy of your ${doc.name.toLowerCase()}.`}
                   </p>
                 </div>
 
@@ -609,7 +656,7 @@ export const DocumentsPage = () => {
 
                         {/* Modal Comparison Details Button */}
                         <button
-                          onClick={() => setViewingComparison({ key, docName: doc.name })}
+                          onClick={() => setViewingComparison({ key, docName: docTitle })}
                           className="p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-bold text-xs transition-all cursor-pointer"
                           title="Compare Profile vs Document Data"
                         >
