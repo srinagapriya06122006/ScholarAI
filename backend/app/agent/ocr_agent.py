@@ -509,17 +509,28 @@ class TesseractOCREngine(BaseOCREngine):
     def _parse_nss(self, text: str) -> dict:
         result = {}
         # 1. Volunteer Name
-        m_name = re.search(r"certify\s+that\s+([A-Za-z\s\.]+?)(?:,|\s+of|\s+has|\n)", text, re.IGNORECASE)
+        # Certificate template typically has: "This is to certify that Volunteer \n [NAME] \n Student of [COLLEGE]"
+        name_val = None
+        m_name = re.search(r"certify\s+that\s+(?:Volunteer\s+)?(?:\n\s*)?([A-Za-z\s\.]+?)(?:\s*\n|\s+Student|\s+of|\s+has|,)", text, re.IGNORECASE)
         if m_name:
             val = re.sub(r'[^a-zA-Z\s\.]', '', m_name.group(1)).strip()
-            if len(val) >= 2:
-                result["name"] = val
-        if not result.get("name"):
+            # If val is just 'Volunteer' or contains generic words, look on the next line
+            if val.lower() in ("volunteer", "volunteer name", "the volunteer", "student", ""):
+                m_next = re.search(r"certify\s+that\s+Volunteer\s*\n+([A-Za-z\s\.]+?)(?:\s*\n|\s+Student|\s+of|,)", text, re.IGNORECASE)
+                if m_next:
+                    val = re.sub(r'[^a-zA-Z\s\.]', '', m_next.group(1)).strip()
+            if val and val.lower() not in ("volunteer", "student", "candidate", "") and len(val) >= 2:
+                name_val = val
+
+        if not name_val:
             m_name2 = re.search(r"(?:Volunteer\s+Name|Name)\s*[:/]?\s*([A-Za-z\s\.]+)", text, re.IGNORECASE)
             if m_name2:
                 val = re.sub(r'[^a-zA-Z\s\.]', '', m_name2.group(1)).strip()
-                if len(val) >= 2:
-                    result["name"] = val
+                if val.lower() not in ("volunteer", "student", "candidate") and len(val) >= 2:
+                    name_val = val
+
+        if name_val:
+            result["name"] = name_val
 
         # 2. Certificate No
         m_cert = re.search(r"Certificate\s*(?:No|Number|Sl\s*No)\s*[:/]?\s*([A-Za-z0-9\-/]+)", text, re.IGNORECASE)
@@ -527,9 +538,13 @@ class TesseractOCREngine(BaseOCREngine):
             result["certificate_no"] = m_cert.group(1).strip()
 
         # 3. College
-        m_col = re.search(r"(?:College|Institution)\s*[:/]?\s*([^\n,]+)", text, re.IGNORECASE)
+        m_col = re.search(r"Student\s+of\s+([^\n,]+)", text, re.IGNORECASE)
         if m_col:
             result["college"] = m_col.group(1).strip()
+        else:
+            m_col2 = re.search(r"(?:College|Institution)\s*[:/]?\s*([^\n,]+)", text, re.IGNORECASE)
+            if m_col2:
+                result["college"] = m_col2.group(1).strip()
 
         result["nss_status"] = "Eligible NSS Volunteer"
         return result
